@@ -90,6 +90,15 @@ def build_manifest(
             {"name": m.name, "backend": m.backend, "params": m.params}
             for m in config.models
         ],
+        "mlforecast": (
+            {
+                "lags": config.mlforecast.lags,
+                "date_features": config.mlforecast.date_features,
+                "target_transforms": config.mlforecast.target_transforms,
+            }
+            if config.mlforecast is not None
+            else None
+        ),
         "evaluation": {
             "metrics": config.evaluation.metrics,
             "rank_metric": config.evaluation.rank_metric,

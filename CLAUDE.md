@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working in this repository.
 
 ## Project Status
 
-`tsforecasting` MVP-0 (StatsForecast vertical slice) is implemented. The package lives under `src/tsforecasting/` with a `tsforecasting` CLI (`validate-config` / `run` / `backtest`), `pytest` + `ruff` in the dev group, and an example config at `configs/examples/ett_small_stats.yaml` (hourly `ETTh1`). MVP-1 backends (MLForecast / NeuralForecast / HierarchicalForecast) are declared as extras but not yet implemented; see `docs/PLAN.md`.
+`tsforecasting` MVP-0 (StatsForecast vertical slice) and the MVP-1 MLForecast backend are implemented. The package lives under `src/tsforecasting/` with a `tsforecasting` CLI (`validate-config` / `run` / `backtest`), `pytest` + `ruff` in the dev group, and example configs at `configs/examples/ett_small_stats.yaml` (StatsForecast) and `configs/examples/ett_small_ml.yaml` (mixed StatsForecast + MLForecast on hourly `ETTh1`). Orchestration dispatches one adapter per backend so a single run ranks models across backends. NeuralForecast / HierarchicalForecast are declared as extras but not yet implemented; see `docs/PLAN.md`.
 
 Read these before implementation:
 
@@ -27,6 +27,7 @@ Read these before implementation:
 - Internal forecasting data contract is Nixtla long table: `unique_id / ds / y`.
 - MVP-0 is Nixtla-only StatsForecast first: `SeasonalNaive` / `AutoETS`, UtilsForecast metrics, core artifacts, and manifest.
 - MVP-1 adds MLForecast, NeuralForecast CPU smoke, and HierarchicalForecast with `TourismSmall`.
+- Each backend is an adapter under `src/tsforecasting/models/nixtla/` mirroring `StatsForecastAdapter` (`predict`/`cross_validation` returning the canonical long contracts with the dense-rank `horizon` column + a `timing` dict); `src/tsforecasting/orchestration/run.py` groups models by backend, builds one adapter per backend, and lazy-imports optional backends so the base install stays importable. Add NeuralForecast/hierarchical by following this pattern.
 - Full Nixtla catalog, Jupyter reporting, TimeGPT, legacy adapters, and local foundation models are future phases, not MVP-0 blockers.
 - Reuse Nixtla native APIs for training, prediction, cross-validation, feature handling, evaluation, plotting, and reconciliation when available.
 - `tsforecasting` should focus on config parsing, validation, field mapping, output normalization, logging, artifacts, and phase-appropriate reporting.

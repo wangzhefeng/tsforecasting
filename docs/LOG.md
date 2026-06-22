@@ -9,6 +9,30 @@
 - 具体计划项状态记录在 `docs/PLAN.md` 的“计划项实现记录”。
 - 日志条目应包含日期、类型、摘要、涉及文件、验证命令、结果和下一步。
 
+## 2026-06-23 - P7 MLForecast backend 完成（MVP-1）
+
+- 类型：impl（mvp-1 / P7）
+- 摘要：接入 MLForecast sklearn preset 后端，进入统一 metrics/comparison。`config/schema.py` 增 `mlforecast` backend 与顶层 `MLForecastConfig`（`lags`/`date_features`/`target_transforms`，后者为可序列化 `{class,args?,kwargs?}` spec，由 adapter 解析实例化，保持 `run_config.yaml` YAML-safe）；校验：有 `mlforecast` 模型则必须有顶层 `mlforecast.lags` 非空。`models/registry.py` 注册 6 个 sklearn preset（`linear_regression`/`ridge`/`lasso`/`elastic_net`/`random_forest`/`hist_gradient_boosting`，`dependency_group="ml"`，`class_path` 指向 sklearn regressor，`build_model` 用 `cls(**params)` 实例化、adapter 再包进 `MLForecast`）。新增 `models/nixtla/ml.py` `MLForecastAdapter`，逐行镜像 `StatsForecastAdapter`：相同 `predict`/`cross_validation`、wide→long melt、按列序位置映射 model 名、dense-rank `horizon` 派生、batched 计时。`orchestration/run.py` 改为按 backend 分组建适配器（`mlforecast` 分支 lazy import），concat predictions/backtest 后统一评估排名。`evaluation/metrics.py` `build_runtime_metrics` 改 `timings: dict[backend->timing]`。`artifacts/writer.py` manifest 增条件 `mlforecast` provenance 键。新示例 `configs/examples/ett_small_ml.yaml`（statsforecast + mlforecast 混合 + `Differences([24])` target transform）。
+- mlforecast 1.0.31 API spike 结论（关键）：
+  - 构造函数 `MLForecast(models, freq, lags=None, lag_transforms=None, date_features=None, num_threads=1, target_transforms=None, ...)` —— **`freq` 为必填位置参数**（adapter 接 `loaded.meta["freq"]`）。
+  - `predict(h)` 位置参数；`cross_validation(df, n_windows, h, step_size=None, ...)`（`n_windows` 在 `h` 前，故用关键字调用）。
+  - predict 产 `unique_id, ds, <模型列>`；cv 产 `unique_id, ds, cutoff, y, <模型列>`；**输出列序与 `models=` 列表序一致** → stats.py 的按位置 `_name_map` 直接复用，无需改动。列名按 class 名（同类重复加数字后缀，6 个不同 preset 不冲突）。
+  - 依赖：`mlforecast 1.0.31` / `scikit-learn 1.9.0` / `utilsforecast 0.2.16` 已在 `uv.lock`，`uv sync --extra ml` 无版本冲突（P1 spike 已锁 `pandas<3`/`numpy<2.5` 兼容）。
+- 关键决策：用户确认范围为「full multi-backend mixed run」+「full v1 preset list」+「本轮接入 target_transforms」。lazy import 保证无 `ml` extra 时包仍可 import；ml 相关测试用 `pytest.importorskip("mlforecast"/"sklearn")` 跳过。
+- 涉及文件：`src/tsforecasting/config/schema.py`、`src/tsforecasting/config/__init__.py`、`src/tsforecasting/models/registry.py`、`src/tsforecasting/models/nixtla/ml.py`（新）、`src/tsforecasting/orchestration/run.py`、`src/tsforecasting/evaluation/metrics.py`、`src/tsforecasting/artifacts/writer.py`、`configs/examples/ett_small_ml.yaml`（新）、`tests/unit/test_ml_backend.py`（新）、`tests/unit/test_registry.py`、`tests/unit/test_config.py`、`tests/integration/test_run_smoke.py`。
+- 验证命令：
+
+```bash
+uv sync --extra ml
+uv run tsforecasting validate-config --config configs/examples/ett_small_ml.yaml
+uv run tsforecasting run --config configs/examples/ett_small_ml.yaml --run-id ml-smoke
+uv run pytest -q          # 51 passed（with ml extra）；base env 45 passed, 3 skipped
+uv run ruff check .       # All checks passed
+```
+
+- 结果：通过。混合 run 在 ETTh1 产出 7 个 artifact；`model_comparison.csv` 跨 backend 排名（`linear_regression` mae=1.241 rank1 胜 `seasonal_naive` mae=1.422 rank2 胜 `random_forest` mae=1.453 rank3）；`runtime_metrics` 按 backend 分别计时（statsforecast 0.013s，mlforecast 9.49s 两模型共享）；manifest 含 `mlforecast` provenance 键与 `per_backend_seed={statsforecast,mlforecast}`；`target_transforms` `Differences([24])` 正常。base env（无 ml extra）ml 测试跳过、stats/config 测试全绿，lazy-import 不变量成立。
+- 下一步：P8 NeuralForecast CPU smoke（`NHITS`/`NBEATS`，受控训练步数 + `val_size` 语义）。
+
 ## 2026-06-23 - P2–P6 MVP-0 纵切面完成
 
 - 类型：impl（mvp-0 / P2–P6）

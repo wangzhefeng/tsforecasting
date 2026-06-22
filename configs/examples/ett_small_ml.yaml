@@ -1,0 +1,54 @@
+# MVP-1 example: mixed StatsForecast baseline + MLForecast sklearn presets on
+# hourly ETTh1. freq 1h / lags include 24 to match the hourly daily seasonality.
+# Both backends flow into one ranked model_comparison.csv.
+data:
+  path: examples/ett_small/ETTh1.csv
+  time_col: date
+  target_col: OT
+  id_col: null            # single series -> unique_id = "series_0"
+  freq: 1h
+
+backtest:
+  horizon: 24
+  n_windows: 3
+  step_size: 24
+
+models:
+  - name: seasonal_naive
+    backend: statsforecast
+    params:
+      season_length: 24
+  - name: linear_regression
+    backend: mlforecast
+    params: {}
+  - name: random_forest
+    backend: mlforecast
+    params:
+      n_estimators: 100
+      random_state: 0
+
+# Shared MLForecast framework params for every mlforecast model above.
+mlforecast:
+  lags: [1, 24]
+  date_features: ["hour"]
+  target_transforms:
+    - class: mlforecast.target_transforms.Differences
+      args: [[24]]
+
+evaluation:
+  metrics: [mae, rmse, mape, smape]
+  rank_metric: mae
+
+predict:
+  horizon: 24             # when present, `run` also emits predictions.csv
+
+runtime:
+  collect_timing: true
+  log_name: ett_small_ml
+  log_level: INFO
+
+artifacts:
+  output_dir: runs/ett_small_ml
+  save_plots: false
+
+seed: 0

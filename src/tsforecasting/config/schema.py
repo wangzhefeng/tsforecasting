@@ -16,7 +16,7 @@ from typing import Any
 
 import yaml
 
-SUPPORTED_BACKENDS = frozenset({"statsforecast"})
+SUPPORTED_BACKENDS = frozenset({"statsforecast", "mlforecast"})
 CORE_METRICS = frozenset({"mae", "rmse", "mape", "smape"})
 VALID_LOG_LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
 
@@ -60,6 +60,21 @@ class PredictConfig:
 
 
 @dataclass
+class MLForecastConfig:
+    """Shared MLForecast framework params (lags / date features / target transforms).
+
+    MLForecast wraps all its inner models in one framework object that shares
+    these feature/transform settings, so they live at the top level rather than
+    per-model. ``target_transforms`` is a serializable spec (``{class, args?,
+    kwargs?}``) resolved by the adapter, keeping ``run_config.yaml`` YAML-safe.
+    """
+
+    lags: list[int]
+    date_features: list[str] | None = None
+    target_transforms: list[dict[str, Any]] | None = None
+
+
+@dataclass
 class RuntimeConfig:
     collect_timing: bool = True
     log_name: str = "main"
@@ -81,6 +96,7 @@ class Config:
     runtime: RuntimeConfig
     artifacts: ArtifactsConfig
     predict: PredictConfig | None = None
+    mlforecast: MLForecastConfig | None = None
     seed: int = 0
     # resolved at run time:
     run_id: str | None = None
@@ -162,6 +178,40 @@ def _build_artifacts(raw: dict) -> ArtifactsConfig:
     )
 
 
+def _build_mlforecast(raw: dict) -> MLForecastConfig:
+    lags = _require(raw, "lags", "mlforecast")
+    if not isinstance(lags, list) or not lags or not all(
+        isinstance(x, int) and not isinstance(x, bool) for x in lags
+    ):
+        raise ConfigError("mlforecast.lags: must be a non-empty list of integers")
+    date_features = raw.get("date_features")
+    if date_features is not None and (
+        not isinstance(date_features, list)
+        or not all(isinstance(x, str) for x in date_features)
+    ):
+        raise ConfigError("mlforecast.date_features: must be a list of strings or null")
+    target_transforms = raw.get("target_transforms")
+    if target_transforms is not None:
+        if not isinstance(target_transforms, list):
+            raise ConfigError("mlforecast.target_transforms: must be a list or null")
+        for i, spec in enumerate(target_transforms):
+            if not isinstance(spec, dict) or not isinstance(spec.get("class"), str) or not spec["class"].strip():
+                raise ConfigError(
+                    f"mlforecast.target_transforms[{i}]: must be a mapping with a string 'class'"
+                )
+            for k in ("args", "kwargs"):
+                v = spec.get(k)
+                if v is not None and not isinstance(v, (list, dict)):
+                    raise ConfigError(
+                        f"mlforecast.target_transforms[{i}].{k}: must be a list/dict or null"
+                    )
+    return MLForecastConfig(
+        lags=list(lags),
+        date_features=list(date_features) if date_features else None,
+        target_transforms=list(target_transforms) if target_transforms else None,
+    )
+
+
 def _build_config(raw: dict) -> Config:
     data = _build_data(_require(raw, "data", "config"))
     bt_raw = _require(raw, "backtest", "config")
@@ -177,6 +227,9 @@ def _build_config(raw: dict) -> Config:
     predict = None
     if raw.get("predict"):
         predict = PredictConfig(horizon=_require_pos_int(raw["predict"], "horizon", "predict"))
+    mlforecast = None
+    if raw.get("mlforecast"):
+        mlforecast = _build_mlforecast(raw["mlforecast"])
     seed = raw.get("seed", 0)
     if not isinstance(seed, int) or isinstance(seed, bool):
         raise ConfigError("seed must be an integer")
@@ -188,6 +241,7 @@ def _build_config(raw: dict) -> Config:
         runtime=runtime,
         artifacts=artifacts,
         predict=predict,
+        mlforecast=mlforecast,
         seed=seed,
     )
 
@@ -202,7 +256,14 @@ def validate(config: Config) -> Config:
         if m.backend not in SUPPORTED_BACKENDS:
             raise ConfigError(
                 f"models[{m.name}]: backend '{m.backend}' not supported "
-                f"(MVP-0: {sorted(SUPPORTED_BACKENDS)})"
+                f"(supported: {sorted(SUPPORTED_BACKENDS)})"
+            )
+
+    if any(m.backend == "mlforecast" for m in config.models):
+        if config.mlforecast is None:
+            raise ConfigError(
+                "models use backend 'mlforecast' but no top-level 'mlforecast' section "
+                "(with non-empty 'lags') is configured"
             )
 
     bad_metrics = [m for m in config.evaluation.metrics if m not in CORE_METRICS]

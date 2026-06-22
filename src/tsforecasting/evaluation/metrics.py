@@ -63,29 +63,37 @@ def compute_metrics(backtest: pd.DataFrame, run_id: str) -> pd.DataFrame:
 def build_runtime_metrics(
     run_id: str,
     built_models: list[BuiltModel],
-    timing: dict[str, float],
+    timings: dict[str, dict[str, float]],
     n_series: int,
     n_rows: int,
 ) -> pd.DataFrame:
-    """Per-model runtime metrics. Timing is batch-shared by the StatsForecast adapter."""
-    total = (
-        timing["fit_seconds"] + timing["predict_seconds"] + timing["cross_validation_seconds"]
-    )
-    rows = [
-        {
-            "run_id": run_id,
-            "backend": b.backend,
-            "model": b.name,
-            "model_type": b.model_type,
-            "n_series": n_series,
-            "n_rows": n_rows,
-            "fit_seconds": timing["fit_seconds"],
-            "predict_seconds": timing["predict_seconds"],
-            "cross_validation_seconds": timing["cross_validation_seconds"],
-            "total_seconds": total,
-        }
-        for b in built_models
-    ]
+    """Per-model runtime metrics.
+
+    ``timings`` maps backend -> batch-shared timing dict (each adapter fits all
+    of its models in one batched object, so timing is shared within a backend).
+    """
+    rows = []
+    for b in built_models:
+        timing = timings[b.backend]
+        total = (
+            timing["fit_seconds"]
+            + timing["predict_seconds"]
+            + timing["cross_validation_seconds"]
+        )
+        rows.append(
+            {
+                "run_id": run_id,
+                "backend": b.backend,
+                "model": b.name,
+                "model_type": b.model_type,
+                "n_series": n_series,
+                "n_rows": n_rows,
+                "fit_seconds": timing["fit_seconds"],
+                "predict_seconds": timing["predict_seconds"],
+                "cross_validation_seconds": timing["cross_validation_seconds"],
+                "total_seconds": total,
+            }
+        )
     return pd.DataFrame(rows, columns=RUNTIME_METRICS_COLUMNS)
 
 

@@ -1,9 +1,9 @@
-"""MVP-0 preset registry.
+"""Preset registry.
 
-A minimal registry mapping the MVP-0 config model names to their Nixtla
-``class_path`` plus metadata (backend, model_type, status, dependency_group).
-The full Nixtla catalog is a Phase-2 concern; MVP-0 only registers the two
-StatsForecast smoke models.
+Maps config model names to their ``class_path`` plus metadata (backend,
+model_type, status, dependency_group). MVP-0 registers the two StatsForecast
+smoke models; MVP-1 adds the MLForecast sklearn presets. The full Nixtla
+catalog is a Phase-2 concern.
 """
 
 from __future__ import annotations
@@ -56,6 +56,63 @@ REGISTRY: list[RegistryEntry] = [
         mvp_preset=True,
         status="mvp_smoke",
         dependency_group="core",
+    ),
+    # MLForecast sklearn presets (MVP-1). class_path targets the inner sklearn
+    # regressor; build_model instantiates it via cls(**params) and the
+    # MLForecastAdapter wraps the instances in one MLForecast framework object.
+    RegistryEntry(
+        backend="mlforecast",
+        model_name="linear_regression",
+        class_path="sklearn.linear_model.LinearRegression",
+        model_type="linear",
+        mvp_preset=True,
+        status="mvp_smoke",
+        dependency_group="ml",
+    ),
+    RegistryEntry(
+        backend="mlforecast",
+        model_name="ridge",
+        class_path="sklearn.linear_model.Ridge",
+        model_type="ridge",
+        mvp_preset=True,
+        status="mvp_smoke",
+        dependency_group="ml",
+    ),
+    RegistryEntry(
+        backend="mlforecast",
+        model_name="lasso",
+        class_path="sklearn.linear_model.Lasso",
+        model_type="lasso",
+        mvp_preset=True,
+        status="mvp_smoke",
+        dependency_group="ml",
+    ),
+    RegistryEntry(
+        backend="mlforecast",
+        model_name="elastic_net",
+        class_path="sklearn.linear_model.ElasticNet",
+        model_type="elasticnet",
+        mvp_preset=True,
+        status="mvp_smoke",
+        dependency_group="ml",
+    ),
+    RegistryEntry(
+        backend="mlforecast",
+        model_name="random_forest",
+        class_path="sklearn.ensemble.RandomForestRegressor",
+        model_type="random_forest",
+        mvp_preset=True,
+        status="mvp_smoke",
+        dependency_group="ml",
+    ),
+    RegistryEntry(
+        backend="mlforecast",
+        model_name="hist_gradient_boosting",
+        class_path="sklearn.ensemble.HistGradientBoostingRegressor",
+        model_type="hist_gbm",
+        mvp_preset=True,
+        status="mvp_smoke",
+        dependency_group="ml",
     ),
 ]
 

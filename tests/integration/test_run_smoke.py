@@ -18,6 +18,7 @@ from tsforecasting.config import load_config, resolve_overrides
 from tsforecasting.orchestration import run_pipeline
 
 EXAMPLE = Path("configs/examples/ett_small_stats.yaml")
+ML_EXAMPLE = Path("configs/examples/ett_small_ml.yaml")
 
 _MANIFEST_KEYS = [
     "run_id",
@@ -113,3 +114,29 @@ def test_cli_dry_run_writes_nothing(tmp_path: Path, capsys: pytest.CaptureFixtur
     assert rc == 0
     assert "dry-run plan" in capsys.readouterr().out
     assert not (tmp_path / "runs").exists()
+
+
+def test_run_pipeline_ml_mixed_smoke(tmp_path: Path) -> None:
+    """Mixed statsforecast + mlforecast run ranks both backends together."""
+    pytest.importorskip("mlforecast")
+    config = load_config(ML_EXAMPLE)
+    resolve_overrides(config, run_id="ml-smoke-test", output_dir=str(tmp_path / "runs"))
+
+    run_dir = run_pipeline(config, do_predict=True)
+    assert run_dir == tmp_path / "runs" / "ml-smoke-test"
+
+    comp = pd.read_csv(run_dir / "model_comparison.csv")
+    assert set(comp["backend"]) == {"statsforecast", "mlforecast"}
+    assert list(comp["rank"]) == list(range(1, len(comp) + 1))
+    assert comp.sort_values("rank").iloc[0]["rank_metric"] == "mae"
+
+    runtime = pd.read_csv(run_dir / "runtime_metrics.csv")
+    assert {"linear", "random_forest", "naive"} <= set(runtime["model_type"])
+
+    metrics = pd.read_csv(run_dir / "metrics.csv")
+    assert set(metrics["backend"]) == {"statsforecast", "mlforecast"}
+
+    manifest = json.loads((run_dir / "manifest.json").read_text())
+    assert manifest["mlforecast"]["lags"] == [1, 24]
+    assert manifest["predict"] == {"horizon": 24}
+    assert set(manifest["per_backend_seed"]) == {"statsforecast", "mlforecast"}

@@ -86,6 +86,40 @@ def test_unsupported_backend_raises(tmp_path: Path) -> None:
         load_config(_write(tmp_path, data))
 
 
+def test_mlforecast_backend_requires_section(tmp_path: Path) -> None:
+    data = _base()
+    data["models"].append({"name": "linear_regression", "backend": "mlforecast", "params": {}})
+    # mlforecast model but no top-level mlforecast section -> error
+    with pytest.raises(ConfigError, match="mlforecast"):
+        load_config(_write(tmp_path, data))
+
+
+def test_mlforecast_section_loads(tmp_path: Path) -> None:
+    data = _base()
+    data["models"].append({"name": "linear_regression", "backend": "mlforecast", "params": {}})
+    data["mlforecast"] = {"lags": [1, 24], "date_features": ["hour"]}
+    config = load_config(_write(tmp_path, data))
+    assert config.mlforecast is not None
+    assert config.mlforecast.lags == [1, 24]
+    assert config.mlforecast.date_features == ["hour"]
+
+
+def test_mlforecast_empty_lags_raises(tmp_path: Path) -> None:
+    data = _base()
+    data["models"].append({"name": "linear_regression", "backend": "mlforecast", "params": {}})
+    data["mlforecast"] = {"lags": []}
+    with pytest.raises(ConfigError, match="lags"):
+        load_config(_write(tmp_path, data))
+
+
+def test_mlforecast_bad_target_transforms_raises(tmp_path: Path) -> None:
+    data = _base()
+    data["models"].append({"name": "linear_regression", "backend": "mlforecast", "params": {}})
+    data["mlforecast"] = {"lags": [1], "target_transforms": [{"args": [1]}]}  # missing 'class'
+    with pytest.raises(ConfigError, match="target_transforms"):
+        load_config(_write(tmp_path, data))
+
+
 def test_unsupported_metric_raises(tmp_path: Path) -> None:
     data = _base()
     data["evaluation"]["metrics"] = ["mae", "mase"]

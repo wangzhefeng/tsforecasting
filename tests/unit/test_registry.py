@@ -37,8 +37,24 @@ def _config(models: list[ModelConfig]) -> Config:
 def test_registry_contains_mvp0_models() -> None:
     names = {e.model_name for e in REGISTRY}
     assert {"seasonal_naive", "auto_ets"} <= names
-    assert all(e.dependency_group == "core" for e in REGISTRY)
-    assert all(e.backend == "statsforecast" for e in REGISTRY)
+    # statsforecast entries stay on the core dependency group
+    stats_entries = [e for e in REGISTRY if e.backend == "statsforecast"]
+    assert all(e.dependency_group == "core" for e in stats_entries)
+
+
+def test_registry_contains_mlforecast_presets() -> None:
+    ml_entries = [e for e in REGISTRY if e.backend == "mlforecast"]
+    names = {e.model_name for e in ml_entries}
+    assert {
+        "linear_regression",
+        "ridge",
+        "lasso",
+        "elastic_net",
+        "random_forest",
+        "hist_gradient_boosting",
+    } <= names
+    assert all(e.dependency_group == "ml" for e in ml_entries)
+    assert all(e.class_path.startswith("sklearn.") for e in ml_entries)
 
 
 def test_get_entry_known_and_unknown() -> None:
@@ -57,6 +73,18 @@ def test_build_model_instantiates_with_params() -> None:
     from statsforecast.models import SeasonalNaive
 
     assert isinstance(built.instance, SeasonalNaive)
+
+
+def test_build_model_instantiates_mlforecast_preset() -> None:
+    pytest.importorskip("sklearn")
+    built = build_model(
+        ModelConfig(name="random_forest", backend="mlforecast", params={"n_estimators": 5})
+    )
+    assert built.backend == "mlforecast"
+    assert built.model_type == "random_forest"
+    from sklearn.ensemble import RandomForestRegressor
+
+    assert isinstance(built.instance, RandomForestRegressor)
 
 
 def test_build_models_from_config() -> None:
