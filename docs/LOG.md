@@ -9,6 +9,63 @@
 - 具体计划项状态记录在 `docs/PLAN.md` 的“计划项实现记录”。
 - 日志条目应包含日期、类型、摘要、涉及文件、验证命令、结果和下一步。
 
+## 2026-06-22 - v2 知识入口同步
+
+- 类型：docs
+- 摘要：按 `neat-freak` 审查项目知识入口，将 README、AGENTS、CLAUDE 从 v1/MVP 全量口径同步到 v2 当前实施基线和 MVP-0/MVP-1 分阶段口径。
+- 涉及文件：
+  - `README.md`
+  - `AGENTS.md`
+  - `CLAUDE.md`
+  - `docs/PLAN.md`
+  - `docs/LOG.md`
+- 验证命令：
+
+```bash
+wc -l README.md AGENTS.md CLAUDE.md docs/*.md
+rg -n "unified-ts-framework-plan-v1|unified-ts-framework-plan-v2|MVP-0|MVP-1|Jupyter|reporting|utils/log_util|src/tsforecasting/utils" README.md AGENTS.md CLAUDE.md docs/*.md
+python3 - <<'PY'
+from pathlib import Path
+paths = ["README.md", "AGENTS.md", "CLAUDE.md", "docs/PLAN.md", "docs/LOG.md", "docs/unified-ts-framework-plan-v2.md"]
+for path in paths:
+    text = Path(path).read_text()
+    fence = "`" * 3
+    trailing = [i for i, line in enumerate(text.splitlines(), 1) if line.rstrip() != line]
+    print(f"{path}: fence_even={text.count(fence) % 2 == 0}, trailing_ws={trailing[:5]}")
+PY
+git diff --check -- README.md AGENTS.md CLAUDE.md docs
+```
+
+- 结果：通过。README、AGENTS、CLAUDE 已指向 v2 当前实施基线；MVP-0/MVP-1、Phase 2、日志工具包边界、Markdown 围栏、尾随空白和 diff 检查通过。
+- 下一步：从 `docs/PLAN.md` 的 P1 开始实施 MVP-0 工程脚手架与测试基础。
+
+## 2026-06-22 - 方案与计划优化
+
+- 类型：docs
+- 摘要：根据方案评审结论新增 v2 当前实施基线，将过大的 Nixtla-only MVP 拆成 MVP-0/MVP-1，并同步重排 `docs/PLAN.md` 的执行计划。
+- 涉及文件：
+  - `docs/unified-ts-framework-plan-v2.md`
+  - `docs/PLAN.md`
+  - `docs/LOG.md`
+- 验证命令：
+
+```bash
+test -f docs/unified-ts-framework-plan-v2.md
+rg -n "MVP-0|MVP-1|Phase 2|unified-ts-framework-plan-v2" docs
+python3 - <<'PY'
+from pathlib import Path
+paths = ["docs/unified-ts-framework-plan-v2.md", "docs/PLAN.md", "docs/LOG.md"]
+for path in paths:
+    text = Path(path).read_text()
+    fence = "`" * 3
+    print(f"{path}: fence_even={text.count(fence) % 2 == 0}")
+PY
+git diff --check -- docs
+```
+
+- 结果：通过。v2 方案文件已创建，`docs/PLAN.md` 已指向 v2；MVP-0/MVP-1/Phase 2 边界、Markdown 围栏和 diff 检查通过。
+- 下一步：从 `docs/PLAN.md` 的 P1 开始实施 MVP-0 工程脚手架与测试基础。
+
 ## 2026-06-22 - 知识库整理
 
 - 类型：docs

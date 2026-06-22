@@ -1,23 +1,37 @@
 # PLAN.md
 
-本文件是 `tsforecasting` 的可执行开发计划，来源于 `docs/unified-ts-framework-plan-v1.md`。后续开发以本文件的计划项为执行入口。
+本文件是 `tsforecasting` 的可执行开发计划，当前来源于 `docs/unified-ts-framework-plan-v2.md`。后续开发以本文件的计划项为执行入口。
 
 ## 维护规则
 
-- `docs/unified-ts-framework-plan-v1.md` 是 v1 架构方案基线，只记录方案设计、设计决策和方案调整记录。
-- 架构、范围、MVP 目标或模块边界发生变化时，基于最新方案版本生成新的方案文档，例如 `docs/unified-ts-framework-plan-v2.md`，再同步本计划。
+- `docs/unified-ts-framework-plan-v1.md` 是 v1 历史基线，不直接覆盖。
+- `docs/unified-ts-framework-plan-v2.md` 是当前实施基线，记录优化后的阶段边界、MVP 验收和方案调整。
+- 架构、范围、MVP 目标或模块边界再次发生变化时，基于最新方案版本生成新的方案文档，例如 `docs/unified-ts-framework-plan-v3.md`，再同步本计划。
 - 每次实施后更新本文件的“计划项实现记录”，记录已完成内容、验证命令、产物路径和下一步。
 - 开发过程日志写入 `docs/LOG.md`，不要把日志混入方案文档。
 
 ## MVP 成功标准
 
-- ETT 小数据能通过 StatsForecast、MLForecast、NeuralForecast 三类后端运行。
+### MVP-0：StatsForecast 可运行纵切面
+
+- 工程包结构、CLI entrypoint、`pytest` 和基础测试目录已建立。
+- 单一 YAML 配置可通过 `validate-config` 校验。
+- CSV 数据能转换为 Nixtla long table：`unique_id / ds / y`。
+- 数据契约测试覆盖无 `id_col`、重复时间戳、频率缺失或不可推断。
+- StatsForecast `SeasonalNaive` / `AutoETS` smoke 可运行。
 - UtilsForecast 统一产出至少 `mae / rmse / mape / smape`。
-- TourismSmall 示例能产出 base forecasts、reconciled forecasts 和 coherence diagnostics。
 - 统一输出 `predictions.csv`、`backtest_predictions.csv`、`metrics.json`、`metrics.csv`、`runtime_metrics.csv`、`model_comparison.csv`、`manifest.json`。
-- `manifest.json` 记录配置来源、运行命令、日志路径、报告路径、关键环境变量摘要和 artifact 路径。
-- `reports/{run_id}/` 能生成 Jupyter Lab 可打开的模型对比 notebook。
-- TimeGPT、legacy adapter、本地 foundation model 不进入 MVP。
+- `manifest.json` 记录配置来源、运行命令、输入数据、字段映射、模型参数、日志路径、关键环境变量摘要和 artifact 路径。
+
+### MVP-1：Nixtla 后端扩展与层级验证
+
+- MLForecast sklearn preset smoke 可运行，并进入统一 metrics / comparison。
+- NeuralForecast `NHITS` 或 `NBEATS` CPU smoke 可运行，训练步数受控。
+- TourismSmall 示例能产出 base forecasts、reconciled forecasts 和 coherence diagnostics。
+
+### 非 MVP 阻塞项
+
+- Full Nixtla model catalog、Jupyter notebook reporting、更多模型、TimeGPT、legacy adapter、本地 foundation model 不阻塞 MVP-0/MVP-1。
 
 ## 计划项实现记录
 
@@ -25,31 +39,32 @@
 
 | id | phase | task | status | source | done | evidence | next | updated_at |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| P0 | docs | 文档拆分、治理规则与知识入口整理 | done | `docs/unified-ts-framework-plan-v1.md` 第 8、11、12 节 | 新增 `docs/LOG.md`、`docs/PLAN.md`，将方案文档固化为 v1 基线，并同步 README/AGENTS/CLAUDE 当前项目状态 | `README.md`、`AGENTS.md`、`CLAUDE.md`、`docs/LOG.md`、`docs/PLAN.md`、`docs/unified-ts-framework-plan-v1.md` | 从 P1 开始工程脚手架实施 | 2026-06-22 |
-| P1 | mvp | 工程脚手架与依赖 | not_started | 方案第 5、8 节 | 尚未创建 `src/tsforecasting/`、`configs/examples/`、`tests/` 或 CLI 入口 | 无 | 创建基础包结构，加入 Nixtla MVP 依赖并刷新 `uv.lock` | 2026-06-22 |
-| P2 | mvp | YAML 配置与 CLI 入口 | not_started | 方案第 10.1、10.2、10.3 节 | 尚未实现配置 schema、配置校验和 CLI 命令 | 无 | 实现 `validate-config`、`run`、`backtest`、`predict`、`hierarchical`、`report` 命令骨架 | 2026-06-22 |
-| P3 | mvp | canonical data contract 与 feature spec | not_started | 方案第 5.1、5.2、10.2 节 | 尚未实现长表转换、频率校验、外生变量声明 | 无 | 实现 `unique_id / ds / y` 转换、字段映射和 feature spec 解析 | 2026-06-22 |
-| P4 | mvp | Nixtla model catalog / registry | not_started | 方案第 6.1、6.2 节 | 尚未实现 catalog 数据结构、模型目录和 MVP preset | 无 | 实现 registry 字段、Stats/ML/Neural/Hierarchical/Utils 目录和 status 管理 | 2026-06-22 |
-| P5 | mvp | StatsForecast backend | not_started | 方案第 6.3、8 节 | 尚未实现 `models/nixtla/stats.py` | 无 | 接入 SeasonalNaive、AutoETS、轻量 AutoARIMA，并复用原生预测和 cross-validation API | 2026-06-22 |
-| P6 | mvp | MLForecast backend | not_started | 方案第 6.4、8 节 | 尚未实现 `models/nixtla/ml.py` | 无 | 接入 sklearn preset，映射 lags、date features、target transforms 和 exogenous | 2026-06-22 |
-| P7 | mvp | NeuralForecast backend | not_started | 方案第 6.5、8 节 | 尚未实现 `models/nixtla/neural.py` | 无 | 接入 CPU smoke 的 NHITS 或 NBEATS，并复用原生训练、预测、cross-validation、save/load | 2026-06-22 |
-| P8 | mvp | backtesting、evaluation、runtime metrics、artifact | not_started | 方案第 5.3、5.7、5.8、10.6、10.7 节 | 尚未实现统一回测输出、UtilsForecast 评估、运行耗时和 artifact writer | 无 | 输出 predictions、backtest_predictions、metrics、runtime_metrics、model_comparison 和 manifest | 2026-06-22 |
-| P9 | mvp | TourismSmall hierarchical reconciliation | not_started | 方案第 5.5、6.6、10.3、10.5 节 | 尚未实现层级数据加载、base forecast 和 reconciliation artifacts | 无 | 使用 TourismSmall 加载 `Y_df / S_df / tags`，调用 HierarchicalForecast reconciliation | 2026-06-22 |
-| P10 | mvp | Jupyter Lab reporting | not_started | 方案第 5.12、10.7 节 | 尚未实现 reporting 模块和 notebook 模板 | 无 | 读取 run artifacts，生成 `reports/{run_id}/model_comparison.ipynb` 和可选 HTML | 2026-06-22 |
-| P11 | mvp | smoke tests、文档同步和收尾验证 | not_started | 方案第 8、10 节 | 尚未建立测试结构和 smoke 验收命令 | 无 | 补齐文档检查、CLI smoke、ETT 示例、TourismSmall 示例和最终验证记录 | 2026-06-22 |
+| P0 | docs | 文档拆分、治理规则与知识入口整理 | done | `docs/unified-ts-framework-plan-v1.md` 第 8、11、12 节 | 新增 `docs/LOG.md`、`docs/PLAN.md`，将方案文档固化为 v1 基线，并同步 README/AGENTS/CLAUDE 当前项目状态 | `README.md`、`AGENTS.md`、`CLAUDE.md`、`docs/LOG.md`、`docs/PLAN.md`、`docs/unified-ts-framework-plan-v1.md` | 从 v2 优化计划继续推进 P1 | 2026-06-22 |
+| P0.1 | docs | 方案与计划优化为 v2 | done | 方案评审结论 | 新增 `docs/unified-ts-framework-plan-v2.md`，将 MVP 拆成 MVP-0/MVP-1，并同步本计划 | `docs/unified-ts-framework-plan-v2.md`、`docs/PLAN.md`、`docs/LOG.md` | 从 P1 开始 MVP-0 工程脚手架实施 | 2026-06-22 |
+| P0.2 | docs | v2 知识入口同步 | done | `docs/unified-ts-framework-plan-v2.md`、`docs/PLAN.md` | 同步 README、AGENTS、CLAUDE 的当前方案入口、MVP-0/MVP-1 边界和日志工具包边界 | `README.md`、`AGENTS.md`、`CLAUDE.md`、`docs/PLAN.md`、`docs/LOG.md` | 从 P1 开始 MVP-0 工程脚手架实施 | 2026-06-22 |
+| P1 | mvp-0 | 工程脚手架、依赖与测试基础 | not_started | v2 第 3、4、9 节 | 尚未创建 `src/tsforecasting/`、`configs/examples/`、`tests/`、CLI entrypoint 或 `pytest` 配置 | 无 | 创建基础包结构，加入 MVP-0 依赖和 `pytest`，建立最小 CLI 与测试目录 | 2026-06-22 |
+| P2 | mvp-0 | YAML schema、CLI 骨架与配置校验 | not_started | v2 第 5.2、5.3 节 | 尚未实现配置 schema、`validate-config`、运行级 override 或配置测试 | 无 | 实现单一 YAML schema，支持 `validate-config`、`run`、`backtest` 骨架和 schema 单元测试 | 2026-06-22 |
+| P3 | mvp-0 | canonical data contract 与 artifact schema | not_started | v2 第 5.1、7 节 | 尚未实现 long table 转换、频率校验、重复时间戳检查或 artifact schema | 无 | 实现 `unique_id / ds / y` 转换、字段映射、频率校验、artifact 字段契约和单元测试 | 2026-06-22 |
+| P4 | mvp-0 | MVP preset registry | not_started | v2 第 6 节 | 尚未实现 registry 数据结构或 MVP preset | 无 | 只注册 `SeasonalNaive`、`AutoETS` 等 MVP-0 StatsForecast smoke 模型，不做 full catalog | 2026-06-22 |
+| P5 | mvp-0 | StatsForecast backend | not_started | v2 第 3.1、6、7 节 | 尚未实现 `models/nixtla/stats.py` | 无 | 接入 `SeasonalNaive`、`AutoETS`，复用原生 `forecast` / `cross_validation` 并标准化输出 | 2026-06-22 |
+| P6 | mvp-0 | backtesting、UtilsForecast evaluation 与 artifacts | not_started | v2 第 5.2、7、9 节 | 尚未实现统一回测输出、UtilsForecast 评估、运行耗时、artifact writer 或 manifest writer | 无 | 输出 predictions、backtest_predictions、metrics、runtime_metrics、model_comparison 和 manifest，并补 smoke 测试 | 2026-06-22 |
+| P7 | mvp-1 | MLForecast backend | not_started | v2 第 3.2、6、9 节 | 尚未实现 `models/nixtla/ml.py` | 无 | 接入 sklearn preset，映射 lags、date features、target transforms，并进入统一评估与 artifact | 2026-06-22 |
+| P8 | mvp-1 | NeuralForecast backend | not_started | v2 第 3.2、6、9 节 | 尚未实现 `models/nixtla/neural.py` | 无 | 接入 CPU smoke 的 NHITS 或 NBEATS，限制训练步数，并处理 NeuralForecast 验证语义 | 2026-06-22 |
+| P9 | mvp-1 | TourismSmall hierarchical reconciliation | not_started | v2 第 3.2、8、9 节 | 尚未实现层级数据加载、base forecast、reconciliation artifacts 或 diagnostics | 无 | 使用 TourismSmall 加载 `Y_df / S_df / tags`，调用 HierarchicalForecast reconciliation，并保存 diagnostics | 2026-06-22 |
+| P10 | phase-2 | Jupyter Lab reporting | not_started | v2 第 3.3、7、9 节 | reporting 不再阻塞 MVP；尚未实现 notebook 模板 | 无 | MVP-1 稳定后，读取 run artifacts 生成 `reports/{run_id}/model_comparison.ipynb` 和可选 HTML | 2026-06-22 |
+| P11 | continuous | smoke tests、文档同步和阶段验收 | not_started | v2 第 9、11 节 | 尚未建立阶段性验收记录 | 无 | 每个阶段完成后运行对应 smoke，更新本计划和 `docs/LOG.md`，必要时生成下一版方案 | 2026-06-22 |
 
 ## MVP 开发顺序
 
-1. P1：先补齐工程脚手架、依赖和基础目录，不实现复杂业务逻辑。
-2. P2-P4：先固定配置、数据契约和 model catalog，避免后端实现时字段漂移。
-3. P5-P7：分三类后端接入 StatsForecast、MLForecast、NeuralForecast，每个后端只做适配和输出标准化。
-4. P8：统一 backtesting、evaluation、runtime metrics 和 artifact。
-5. P9：独立实现 TourismSmall 层级验证，不把 ETT 强行改造成层级数据。
-6. P10：实现报告输入和 notebook 输出。
-7. P11：跑通 smoke 验收，更新 `docs/LOG.md` 和本计划的实现记录。
+1. P1：先补齐工程脚手架、CLI entrypoint、依赖分组、`pytest` 和基础测试目录。
+2. P2-P3：固定 YAML schema、CLI 骨架、canonical data contract 和 artifact schema，并用单元测试锁住。
+3. P4-P6：跑通 StatsForecast MVP-0 纵切面，生成统一 metrics、runtime、comparison 和 manifest。
+4. P7-P9：在 MVP-0 稳定后依次加入 MLForecast、NeuralForecast、TourismSmall 层级验证。
+5. P10：作为 Phase 2 实现 reporting，不作为 MVP 阻塞项。
+6. P11：每个阶段都执行 smoke 验收和文档同步，而不是最后集中补测试。
 
 ## 后续阶段 Roadmap
 
-- 阶段 2：扩展更多 Nixtla 模型，按 catalog status 从 `cataloged` 推进到 `validated`，并形成自有四个项目的架构诊断报告。
-- 阶段 3：接入 AIDC demand_load 等业务数据，增加 business profile、业务指标和更完整的复盘 artifact。
-- 阶段 4：单独设计 TimeGPT、legacy adapter 和本地 foundation model 接入，不反向污染 MVP 核心契约。
+- Phase 2：实现 full Nixtla model catalog、Jupyter notebook reporting、更多模型、概率预测、更多图表，并形成自有四个项目的架构诊断报告。
+- Phase 3：接入 AIDC demand_load 等业务数据，增加 business profile、业务指标和更完整的复盘 artifact。
+- Phase 4：单独设计 TimeGPT、legacy adapter 和本地 foundation model 接入，不反向污染 MVP 核心契约。
