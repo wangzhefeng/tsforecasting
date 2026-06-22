@@ -18,10 +18,10 @@
 - 单一 YAML 配置可通过 `validate-config` 校验。
 - CSV 数据能转换为 Nixtla long table：`unique_id / ds / y`。
 - 数据契约测试覆盖无 `id_col`、重复时间戳、频率缺失或不可推断。
-- StatsForecast `SeasonalNaive` / `AutoETS` smoke 可运行。
+- StatsForecast `SeasonalNaive` / `AutoETS` smoke 可运行（示例数据用小时级 `ETTh1.csv`，与 `freq: 1h` / `season_length: 24` 一致；不要用 15 分钟的 `ETTm1.csv` 配 `freq: 1h`）。
 - UtilsForecast 统一产出至少 `mae / rmse / mape / smape`。
-- 统一输出 `predictions.csv`、`backtest_predictions.csv`、`metrics.json`、`metrics.csv`、`runtime_metrics.csv`、`model_comparison.csv`、`manifest.json`。
-- `manifest.json` 记录配置来源、运行命令、输入数据、字段映射、模型参数、日志路径、关键环境变量摘要和 artifact 路径。
+- 统一输出 `predictions.csv`、`backtest_predictions.csv`、`metrics.csv`、`runtime_metrics.csv`、`model_comparison.csv`、`manifest.json`（`metrics.json` 推迟到 MVP-0b）。
+- `manifest.json` 记录配置来源、运行命令、输入数据、字段映射、模型参数、`seed`、`run_id`、日志路径、关键环境变量摘要和 artifact 路径。
 
 ### MVP-1：Nixtla 后端扩展与层级验证
 
@@ -42,7 +42,8 @@
 | P0 | docs | 文档拆分、治理规则与知识入口整理 | done | `docs/unified-ts-framework-plan-v1.md` 第 8、11、12 节 | 新增 `docs/LOG.md`、`docs/PLAN.md`，将方案文档固化为 v1 基线，并同步 README/AGENTS/CLAUDE 当前项目状态 | `README.md`、`AGENTS.md`、`CLAUDE.md`、`docs/LOG.md`、`docs/PLAN.md`、`docs/unified-ts-framework-plan-v1.md` | 从 v2 优化计划继续推进 P1 | 2026-06-22 |
 | P0.1 | docs | 方案与计划优化为 v2 | done | 方案评审结论 | 新增 `docs/unified-ts-framework-plan-v2.md`，将 MVP 拆成 MVP-0/MVP-1，并同步本计划 | `docs/unified-ts-framework-plan-v2.md`、`docs/PLAN.md`、`docs/LOG.md` | 从 P1 开始 MVP-0 工程脚手架实施 | 2026-06-22 |
 | P0.2 | docs | v2 知识入口同步 | done | `docs/unified-ts-framework-plan-v2.md`、`docs/PLAN.md` | 同步 README、AGENTS、CLAUDE 的当前方案入口、MVP-0/MVP-1 边界和日志工具包边界 | `README.md`、`AGENTS.md`、`CLAUDE.md`、`docs/PLAN.md`、`docs/LOG.md` | 从 P1 开始 MVP-0 工程脚手架实施 | 2026-06-22 |
-| P1 | mvp-0 | 工程脚手架、依赖与测试基础 | not_started | v2 第 3、4、9 节 | 尚未创建 `src/tsforecasting/`、`configs/examples/`、`tests/`、CLI entrypoint 或 `pytest` 配置 | 无 | 创建基础包结构，加入 MVP-0 依赖和 `pytest`，建立最小 CLI 与测试目录 | 2026-06-22 |
+| P0.3 | docs | v2 评审修订 | done | v2/v1/PLAN 评审结论 | 修示例数据 ETTm1→ETTh1、MiddleOut 参数取值、补 extras 分组/CLI 语义/输出契约派生规则/seed-run_id、v1 加 SUPERSEDED banner、metrics.json 推迟 MVP-0b、P1 增 dependency spike + logging vendor | `docs/unified-ts-framework-plan-v2.md`、`docs/unified-ts-framework-plan-v1.md`、`docs/PLAN.md`、`docs/LOG.md` | 从 P1 开始 MVP-0 工程脚手架实施 | 2026-06-23 |
+| P1 | mvp-0 | 工程脚手架、依赖与测试基础 | not_started | v2 第 3、4、9、10 节 | 尚未创建 `src/tsforecasting/`、`configs/examples/`、`tests/`、CLI entrypoint 或 `pytest` 配置 | 无 | 先做 dependency spike（验证 statsforecast/utilsforecast 在当前 pandas pin 下可解析并 import；若与 pandas 3.x 不兼容则 MVP-0 pin `pandas<3`），再创建基础包结构、按 §4 extras 加入 base+dev 依赖、将 `log_util` vendor 进 `src/tsforecasting/utils/logging.py`（改 lazy handler，包内禁 import 顶层 `utils/`）、建立最小 CLI（`validate-config` + `run`）与 `pytest` 测试目录 | 2026-06-23 |
 | P2 | mvp-0 | YAML schema、CLI 骨架与配置校验 | not_started | v2 第 5.2、5.3 节 | 尚未实现配置 schema、`validate-config`、运行级 override 或配置测试 | 无 | 实现单一 YAML schema，支持 `validate-config`、`run`、`backtest` 骨架和 schema 单元测试 | 2026-06-22 |
 | P3 | mvp-0 | canonical data contract 与 artifact schema | not_started | v2 第 5.1、7 节 | 尚未实现 long table 转换、频率校验、重复时间戳检查或 artifact schema | 无 | 实现 `unique_id / ds / y` 转换、字段映射、频率校验、artifact 字段契约和单元测试 | 2026-06-22 |
 | P4 | mvp-0 | MVP preset registry | not_started | v2 第 6 节 | 尚未实现 registry 数据结构或 MVP preset | 无 | 只注册 `SeasonalNaive`、`AutoETS` 等 MVP-0 StatsForecast smoke 模型，不做 full catalog | 2026-06-22 |

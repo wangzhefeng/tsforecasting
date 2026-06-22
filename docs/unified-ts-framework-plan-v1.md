@@ -1,6 +1,16 @@
 # 统一时间序列预测框架方案评审稿 v1
 
-> 状态：v1 方案基线，暂不进入代码实现。
+> ⚠️ **SUPERSEDED（已过期，仅作设计史保留）**：所有执行以 `docs/unified-ts-framework-plan-v2.md` + `docs/PLAN.md` 为准。**不要按本文件第 5 节模块图 / 第 6 节 catalog 实施**——下列 v1 内容已在 v2 中删除或后移，照 v1 实施会导致过度抽象：
+>
+> - **MVP 内 full model catalog**（§6.1）→ v2 推到 Phase 2；MVP-0 只注册 `SeasonalNaive` / `AutoETS`。
+> - **`ForecastBackend.fit/predict/cross_validate/save/load` 通用后端协议**（§5.4）→ v2 删除，改为"优先调用各 Nixtla 原生 `forecast` / `cross_validation`"，不做通用 Trainer / FeatureEngineer。
+> - **reporting / Jupyter notebook**（§5.12）→ v2 推到 Phase 2，不阻塞 MVP。
+> - **features / splitting / backtesting 细分模块**（§5.2 / §5.3）→ v2 收敛；MVP-0 只做配置 / 校验 / 映射 / 输出标准化。
+> - **三类后端同时进第一阶段**（§8 阶段 1）→ v2 拆为 MVP-0（仅 StatsForecast）+ MVP-1（ML / Neural / Hierarchical）。
+>
+> 本文件正文不再维护，仅供追溯设计判断与待评审问题的历史。
+
+> 状态：v1 方案基线，**已被 v2 取代，不进入代码实现**（见上方 SUPERSEDED 说明）。
 >
 > 保存位置：`docs/unified-ts-framework-plan-v1.md`
 >

@@ -9,6 +9,32 @@
 - 具体计划项状态记录在 `docs/PLAN.md` 的“计划项实现记录”。
 - 日志条目应包含日期、类型、摘要、涉及文件、验证命令、结果和下一步。
 
+## 2026-06-23 - v2 方案与计划评审修订
+
+- 类型：docs
+- 摘要：按方案评审结论修订 v2/v1/PLAN，修复 P0 硬 bug（示例数据 ETTm1→ETTh1 频率、TourismSmall MiddleOut 参数取值），补依赖 extras 分组、MVP-0 CLI 语义、输出契约派生规则（horizon/rank_metric）、manifest seed/run_id，v1 加 SUPERSEDED banner，`metrics.json` 推迟 MVP-0b，P1 增 dependency spike + logging vendor 子动作。
+- 涉及文件：
+  - `docs/unified-ts-framework-plan-v2.md`
+  - `docs/unified-ts-framework-plan-v1.md`
+  - `docs/PLAN.md`
+  - `docs/LOG.md`
+- 验证命令：
+
+```bash
+python3 - <<'PY'
+from pathlib import Path
+for path in ["docs/unified-ts-framework-plan-v2.md", "docs/unified-ts-framework-plan-v1.md", "docs/PLAN.md", "docs/LOG.md"]:
+    text = Path(path).read_text()
+    fence = "`" * 3
+    print(f"{path}: fence_even={text.count(fence) % 2 == 0}")
+PY
+rg -n "ETTh1|avg_proportions|SUPERSEDED|dependency spike|run_id" docs/unified-ts-framework-plan-v2.md docs/unified-ts-framework-plan-v1.md docs/PLAN.md
+git diff --check -- docs
+```
+
+- 结果：通过。三份文档代码围栏闭合、无尾随空白、`git diff --check` 无报错；v2 §5.3 已用 `ETTh1.csv`、§8 MiddleOut 已用 `avg_proportions`、§4/§5.2/§7/§10 已补 extras/CLI/输出契约/seed-run_id/pandas 兼容风险、v1 顶部 SUPERSEDED banner 就位、PLAN.md P1 含 dependency spike + logging vendor、P0.3 评审记录与 MVP-0 标准已同步。
+- 下一步：从 P1 开始 MVP-0 工程脚手架；第一动作执行 dependency spike 验证 Nixtla 栈与 pandas 兼容性。
+
 ## 2026-06-22 - v2 知识入口同步
 
 - 类型：docs

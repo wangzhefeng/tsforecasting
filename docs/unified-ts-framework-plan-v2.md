@@ -49,8 +49,8 @@ MVP-0 必须包含：
 - MVP preset registry，只注册 `SeasonalNaive`、`AutoETS` 等 StatsForecast smoke 模型。
 - StatsForecast adapter，优先调用原生 `forecast` / `cross_validation`。
 - UtilsForecast 统一产出至少 `mae / rmse / mape / smape`。
-- 基础 artifacts：`run_config.yaml`、`manifest.json`、`predictions.csv`、`backtest_predictions.csv`、`metrics.json`、`metrics.csv`、`runtime_metrics.csv`、`model_comparison.csv`。
-- `manifest.json` 记录配置来源、运行命令、输入数据、字段映射、后端、模型参数、split/backtest 设置、artifact 路径、日志路径和关键环境变量摘要。
+- 基础 artifacts：`run_config.yaml`、`manifest.json`、`predictions.csv`、`backtest_predictions.csv`、`metrics.csv`、`runtime_metrics.csv`、`model_comparison.csv`。`metrics.json`（与 `metrics.csv` 同语义的冗余 json 视图）推迟到 MVP-0b，csv 已满足可复查。
+- `manifest.json` 记录配置来源、运行命令、输入数据、字段映射、后端、模型参数、split/backtest 设置、artifact 路径、日志路径、关键环境变量摘要，以及 `seed`（全局随机种子 + 各后端映射）和 `run_id` 生成规则。`run_id` 默认按 `tsforecasting-<UTC时间戳>-<短hash>` 生成（确定性、可排序），`--run-id` 仅作 override。
 
 MVP-0 不做：
 
@@ -127,10 +127,23 @@ tsforecasting/
   docs/
 ```
 
-日志边界调整：
+依赖分组（阶段边界必须在依赖层硬隔离，MVP-0 只解析 base + dev）：
 
-- v1 要求复用顶层 `utils/log_util.py`。v2 保留该工具的行为契约，但后续实现应迁入或封装到 `src/tsforecasting/utils/`，避免正式安装包依赖仓库顶层 `utils/`。
-- 在迁移前，不能在 feature modules 中重复创建 logger handler。
+```text
+base           = [statsforecast, utilsforecast]             # MVP-0 纵切面只需要这组
+[ml]           = [mlforecast]                                # MVP-1
+[neural]       = [neuralforecast]                            # MVP-1，带 PyTorch，体积大
+[hierarchical] = [hierarchicalforecast, datasetsforecast]    # MVP-1 TourismSmall
+dev            = [pytest, ruff]                              # 测试与 lint
+```
+
+- 对应 catalog 字段 `dependency_group`（core / ml / torch / hierarchical / api）：base→core、ml→ml、neural→torch、hierarchical→hierarchical。
+- `[neural]` 的 PyTorch 体积大，CI 对 `[neural]` smoke 单独跑一个受限 job，不进入默认 `uv sync`。
+
+日志边界（P1 写死为 vendor，不再悬而未决）：
+
+- P1 将 `utils/log_util.py` 的行为契约 vendor 进 `src/tsforecasting/utils/logging.py`；包内任何模块都不得 import 仓库顶层 `utils/`，否则安装包会依赖仓库根目录、不可独立安装。
+- 现状 `utils/log_util.py` 在 import 时即 `mkdir` 并注册两个 handler（有 import 副作用）。迁移时必须改为 lazy：首次 `get_logger()` 才建 handler，避免测试 import 建目录、避免多模块 import 叠加 handler。
 - `SERVICE_LOG_LEVEL` 继续控制日志级别，`LOG_NAME` 继续控制日志目录语义。
 
 ## 5. 数据、配置与回测契约
@@ -169,6 +182,13 @@ MVP-0 只支持单一 YAML 文件和少量运行级 CLI override：
 --dry-run
 ```
 
+MVP-0 CLI 只暴露两个子命令：
+
+- `validate-config --config <path>`：纯 schema 校验，不读数据、不训练。
+- `run --config <path>`：默认执行回测 + 评估（产 `backtest_predictions.csv`、`metrics.csv`、`runtime_metrics.csv`、`model_comparison.csv`、`manifest.json`）；若配置带 `predict.horizon`，额外产 `predictions.csv`（未来预测、无真值）。
+
+`backtest`、`predict`、`hierarchical`、`report` 等子命令在 MVP-0 不暴露，分别推到 MVP-0b / MVP-1 / Phase-2。
+
 MVP-0 backtest 只支持一种主语义：
 
 ```text
@@ -181,7 +201,7 @@ horizon + n_windows + step_size
 
 ```yaml
 data:
-  path: examples/ett_small/ETTm1.csv
+  path: examples/ett_small/ETTh1.csv
   time_col: date
   target_col: OT
   id_col: null
@@ -218,7 +238,8 @@ artifacts:
 
 示例数据策略：
 
-- `examples/ett_small/ETTm1.csv` 是目标路径，不得假设当前已经存在。
+- MVP-0 smoke 选用 `examples/ett_small/ETTh1.csv`（小时采样），与 `freq: 1h` / `season_length: 24` 语义一致。**不要**用 `ETTm1.csv` 配 `freq: 1h`：ETTm1 是 15 分钟采样，会直接撞上频率校验或得到错误季节性。若改用 ETTm1，必须同步改为 `freq: 15min` / `season_length: 96`，并在 data 层显式 resample（MVP-0 不引入 resample）。
+- `examples/ett_small/ETTh1.csv` 是目标路径，不得假设当前已经存在。
 - P1/P2 应明确采用“提交极小 fixture”或“提供下载/cache 命令”中的一种，避免 smoke test 隐式依赖网络。
 
 ## 6. 模型与 registry 策略
@@ -264,6 +285,8 @@ unique_id, ds, y, yhat, model, backend, run_id
 unique_id, cutoff, ds, horizon, y, yhat, model, backend, run_id
 ```
 
+`horizon` 是框架派生列，不是 Nixtla 原生输出：StatsForecast / MLForecast / NeuralForecast 的 `cross_validation` 原生只产 `unique_id, ds, cutoff, y, <各模型列>`（wide，每个模型一列）。adapter 必须做两件事：(1) 多模型 wide→long 归一化，产出统一的 `model` 列；(2) 派生 `horizon = (ds − cutoff) / freq` 的步数。该转换必须有测试覆盖（见 §10）。
+
 运行指标输出：
 
 ```text
@@ -276,7 +299,9 @@ run_id, backend, model, model_type, n_series, n_rows, fit_seconds, predict_secon
 run_id, backend, model, model_type, mae, rmse, mape, smape, total_seconds, rank_metric, rank
 ```
 
-MVP-0 结果目录：
+排名规则默认 `rank_metric = mae`、值升序（值越小 rank 越靠前）；可通过 `evaluation.rank_metric` override 为 `rmse` / `smape` 等已产出指标。
+
+MVP-0 结果目录（`metrics.json` 推迟到 MVP-0b）：
 
 ```text
 runs/{run_id}/
@@ -284,7 +309,6 @@ runs/{run_id}/
   manifest.json
   predictions.csv
   backtest_predictions.csv
-  metrics.json
   metrics.csv
   runtime_metrics.csv
   model_comparison.csv
@@ -310,7 +334,7 @@ reports/{run_id}/
 
 ## 8. TourismSmall 层级配置草案
 
-TourismSmall 不属于 MVP-0，进入 MVP-1。配置必须显式表达 reconciler 参数，不能只写模糊字符串。
+TourismSmall 不属于 MVP-0，进入 MVP-1。配置必须显式表达 reconciler 参数，不能只写模糊字符串；所有参数取值（如 `top_down_method`）必须对齐当前版本 `hierarchicalforecast/methods.py` 的合法字符串，例如 `top_down_method` 只接受 `avg_proportions` 或 `forecast_proportions`。
 
 ```yaml
 data:
@@ -340,7 +364,7 @@ hierarchical:
       class: MiddleOut
       params:
         middle_level: Country/Purpose/State
-        top_down_method: proportion_averages
+        top_down_method: avg_proportions
   diagnostics: true
 
 evaluation:
@@ -378,6 +402,8 @@ Phase 2 验收：
 ## 10. 风险与约束
 
 - NeuralForecast 会引入深度学习依赖，MVP-1 必须限制 CPU smoke 配置和运行时间。
+- pandas 3.x（2026-01 发布，CoW 默认、新 string dtype）与 Nixtla 栈的兼容性不假设成立：P1 dependency spike 必须先验证 statsforecast/utilsforecast 能在当前 pin 下解析并 import；若与 pandas 3.x 不兼容，MVP-0 临时 pin `pandas<3`（pandas 2.2.x），pandas 3.x 升级单列独立任务。
+- Nixtla 三库同装一个环境可能触发原生库冲突，依赖分组（见 §4 extras）用于把 `[neural]` 等重依赖隔离出默认 `uv sync`。
 - ETT、TourismSmall、业务宽表的数据契约不同，必须通过显式 loader 和 manifest 避免隐式转换。
 - StatsForecast、MLForecast、NeuralForecast 的 cross-validation 输出列不同，统一转换必须有测试覆盖。
 - UtilsForecast 通用指标和业务指标必须分层，避免业务口径污染 core evaluation。
@@ -394,6 +420,10 @@ Phase 2 验收：
 | 2026-06-22 | full catalog 和 Jupyter notebook reporting 移到 Phase 2 | 它们是扩展能力，不应阻塞首个可运行框架闭环 | MVP 只要求 CSV/JSON/manifest 可复查 |
 | 2026-06-22 | 测试提前到 P1/P2 | 避免后端实现后才发现配置、数据和 artifact 契约漂移 | P1 引入 pytest，P2/P3 要求 schema 与数据契约测试 |
 | 2026-06-22 | 调整日志工具包边界 | 顶层 `utils/` 不适合作为正式安装包内部依赖 | 后续迁入或封装到 `src/tsforecasting/utils/` |
+| 2026-06-23 | 评审修订：示例数据 `ETTm1.csv`→`ETTh1.csv` | ETTm1 是 15 分钟采样，与 `freq: 1h`/`season_length: 24` 不一致，会让 smoke 撞频率校验 | §5.3 配置草案与数据策略改用小时级 ETTh1；PLAN.md MVP-0 标准同步 |
+| 2026-06-23 | 评审修订：新增依赖 extras 分组 + logging vendor 写死 | 阶段边界需在依赖层硬隔离（neuralforecast 的 torch 不应进核心），且 P1 logging 迁移边界此前未定 | §4 增加 base/[ml]/[neural]/[hierarchical]/dev 分组；P1 将 `log_util` vendor 进 `src/tsforecasting/utils/logging.py` 并改 lazy handler |
+| 2026-06-23 | 评审修订：补 MVP-0 CLI 语义、输出契约派生规则、可复现性字段 | `run`/`backtest`/`predict` 语义未定义；`horizon`/`rank_metric`/`seed`/`run_id` 缺规则 | §5.2 钉死 MVP-0 CLI=`validate-config`+`run`；§7 标注 `horizon` 派生、`rank_metric` 默认 mae；manifest 增 `seed`/`run_id`；`metrics.json` 推迟 MVP-0b |
+| 2026-06-23 | 评审修订：TourismSmall MiddleOut 参数取值修正 + pandas 3.x 兼容风险 | `top_down_method: proportion_averages` 非合法值；pandas 3.x 与 Nixtla 兼容性未验证 | §8 改为 `avg_proportions` 并要求对齐 `methods.py`；§10 + P1 dependency spike 兜底 pin `pandas<3` |
 
 ## 12. 参考资料
 
