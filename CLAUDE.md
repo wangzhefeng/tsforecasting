@@ -10,7 +10,7 @@ Read these before implementation:
 
 - `docs/PLAN.md` — executable development plan and implementation status.
 - `docs/unified-ts-framework-plan-v2.md` — current implementation baseline. Build from this and `docs/PLAN.md`.
-- `docs/unified-ts-framework-plan-v1.md` — v1 historical baseline. Do not overwrite it.
+- `docs/unified-ts-framework-plan-v1.md` — v1 historical baseline, **superseded by v2**; kept for design history only. Do not implement from its module specs (§5 architecture / §6 catalog) and do not overwrite it.
 - `docs/LOG.md` — development log.
 
 ## Toolchain

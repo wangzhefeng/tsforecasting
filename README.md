@@ -14,7 +14,7 @@
 ## 文档入口
 
 - [docs/unified-ts-framework-plan-v2.md](docs/unified-ts-framework-plan-v2.md)：当前实施基线，已将第一阶段拆成 MVP-0/MVP-1。
-- [docs/unified-ts-framework-plan-v1.md](docs/unified-ts-framework-plan-v1.md)：v1 历史基线，保留作方案演进记录，不直接覆盖。
+- [docs/unified-ts-framework-plan-v1.md](docs/unified-ts-framework-plan-v1.md)：v1 历史基线，**已被 v2 取代**，仅作设计演进记录保留。不要按其模块图/catalog 实施，也不直接覆盖。
 - [docs/PLAN.md](docs/PLAN.md)：可执行开发计划和计划项实现记录。后续构建从这里开始。
 - [docs/LOG.md](docs/LOG.md)：开发日志，只记录真实执行过程、验证结果和下一步。
 

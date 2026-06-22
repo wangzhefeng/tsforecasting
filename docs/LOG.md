@@ -9,6 +9,25 @@
 - 具体计划项状态记录在 `docs/PLAN.md` 的“计划项实现记录”。
 - 日志条目应包含日期、类型、摘要、涉及文件、验证命令、结果和下一步。
 
+## 2026-06-23 - 知识入口 neat-freak 同步
+
+- 类型：docs
+- 摘要：按 neat-freak 审查知识入口一致性。v1 已被 v2 取代，但 `CLAUDE.md` / `AGENTS.md` / `README.md` 的 v1 指针只写了"不要覆盖"，未传达"不要按 v1 §5 模块图 / §6 catalog 实施"的硬规则。收紧三处 v1 指针为"已被 v2 取代，仅作设计史保留，勿据其 §5/§6 实施"。无新增历史叙事、净行数 0。
+- 涉及文件：
+  - `CLAUDE.md`
+  - `AGENTS.md`
+  - `README.md`
+- 验证命令：
+
+```bash
+git --no-pager diff -- CLAUDE.md AGENTS.md README.md
+git diff --check -- CLAUDE.md AGENTS.md README.md
+rg -n "今天|昨天|最近|today|yesterday|recently" CLAUDE.md AGENTS.md README.md docs/*.md
+```
+
+- 结果：通过。三处 v1 指针已标注 superseded；净行数 0（同行改写）；全仓无相对时间引用；`git diff --check` 无报错。
+- 下一步：从 P1 开始 MVP-0 工程脚手架。
+
 ## 2026-06-23 - v2 方案与计划评审修订
 
 - 类型：docs
