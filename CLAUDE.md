@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working in this repository.
 
 ## Project Status
 
-`tsforecasting` is still pre-implementation. The repository currently has project metadata, documentation, `utils/log_util.py`, and no `src/`, `configs/`, `examples/`, `tests/`, CLI entrypoint, test runner, or linter.
+`tsforecasting` MVP-0 (StatsForecast vertical slice) is implemented. The package lives under `src/tsforecasting/` with a `tsforecasting` CLI (`validate-config` / `run` / `backtest`), `pytest` + `ruff` in the dev group, and an example config at `configs/examples/ett_small_stats.yaml` (hourly `ETTh1`). MVP-1 backends (MLForecast / NeuralForecast / HierarchicalForecast) are declared as extras but not yet implemented; see `docs/PLAN.md`.
 
 Read these before implementation:
 
@@ -16,9 +16,10 @@ Read these before implementation:
 ## Toolchain
 
 - Python `>=3.12`, managed by `uv`.
-- `uv sync` installs the current environment.
+- `uv sync` installs base + the `dev` group (`pytest`, `ruff`); `uv sync --extra <ml|neural|hierarchical|plot>` adds an extras group.
 - `uv add <pkg>` / `uv add --dev <pkg>` updates dependencies and `uv.lock`.
-- Do not assume `pytest`, `ruff`, or other dev tools exist until the plan adds them.
+- Dev tooling: `uv run pytest`, `uv run ruff check .`.
+- Dependency pins are load-bearing: Nixtla hard-pins `pandas<3`, and numba (transitive via `statsforecast`) caps `numpy<2.5`. Do not bump these without a spike (see `docs/LOG.md` P1).
 
 ## Current MVP Contract
 
@@ -38,7 +39,6 @@ Read these before implementation:
 
 ## Logging
 
-- Reuse the existing `utils.log_util.logger` behavior until P1 migrates or wraps logging under `src/tsforecasting/utils/`.
-- `SERVICE_LOG_LEVEL` controls log level.
-- `LOG_NAME` controls the log directory under `logs/{LOG_NAME}/service*`.
-- Do not create duplicate logger handlers in feature modules.
+- Logging is vendored at `src/tsforecasting/utils/logging.py`: lazy handlers (first `get_logger()` call), CWD-relative `logs/{LOG_NAME}/service*`, no duplicate handlers.
+- `SERVICE_LOG_LEVEL` controls log level; `LOG_NAME` controls the subdirectory under `logs/`.
+- The legacy `utils/log_util.py` is superseded — do not import the repo-top-level `utils/` from inside the package.
