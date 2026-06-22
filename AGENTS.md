@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code when working in this repository.
+This file provides guidance to Codex when working in this repository.
 
 ## Project Status
 
@@ -32,7 +32,7 @@ Read these before implementation:
 
 - After implementation work, update `docs/PLAN.md` plan-item status and append `docs/LOG.md`.
 - If architecture scope, MVP boundary, or module responsibilities change, create a new scheme document such as `docs/unified-ts-framework-plan-v2.md` based on v1.
-- Keep `CLAUDE.md` concise: hard rules only, no development history.
+- Keep `AGENTS.md` concise: hard rules only, no development history.
 
 ## Logging
 
