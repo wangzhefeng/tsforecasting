@@ -1,0 +1,41 @@
+# MVP-0 example: StatsForecast SeasonalNaive + AutoETS on hourly ETTh1.
+# freq 1h / season_length 24 match ETTh1's hourly sampling.
+data:
+  path: examples/ett_small/ETTh1.csv
+  time_col: date
+  target_col: OT
+  id_col: null            # single series -> unique_id = "series_0"
+  freq: 1h
+
+backtest:
+  horizon: 24
+  n_windows: 3
+  step_size: 24
+
+models:
+  - name: seasonal_naive
+    backend: statsforecast
+    params:
+      season_length: 24
+  - name: auto_ets
+    backend: statsforecast
+    params:
+      season_length: 24
+
+evaluation:
+  metrics: [mae, rmse, mape, smape]
+  rank_metric: mae
+
+predict:
+  horizon: 24             # when present, `run` also emits predictions.csv
+
+runtime:
+  collect_timing: true
+  log_name: ett_small_mvp0
+  log_level: INFO
+
+artifacts:
+  output_dir: runs/ett_small_stats
+  save_plots: false
+
+seed: 0

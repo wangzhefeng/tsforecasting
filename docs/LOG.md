@@ -9,6 +9,55 @@
 - 具体计划项状态记录在 `docs/PLAN.md` 的“计划项实现记录”。
 - 日志条目应包含日期、类型、摘要、涉及文件、验证命令、结果和下一步。
 
+## 2026-06-23 - P2–P6 MVP-0 纵切面完成
+
+- 类型：impl（mvp-0 / P2–P6）
+- 摘要：完成 StatsForecast 端到端纵切面。P2：`src/tsforecasting/config/schema.py`（stdlib dataclasses + 手写校验，无 pydantic；`load_config`/`validate`/`generate_run_id`/`resolve_overrides`）+ 示例配置 `configs/examples/ett_small_stats.yaml` + CLI `validate-config`。P3：`src/tsforecasting/data/loader.py`（CSV→`unique_id/ds/y`；字段映射；`id_col` 空→`series_0`；重复时间戳报错；freq 显式或可推断；缺失点计数不填充）+ `artifacts/schema.py` 列契约。P4：`src/tsforecasting/models/registry.py`（注册 `seasonal_naive`/`auto_ets`，`build_models` 动态 import）。P5：`src/tsforecasting/models/nixtla/stats.py`（`StatsForecastAdapter` 复用原生 `fit`/`predict`/`cross_validation`，wide→long 归一，`horizon` 由 dense rank 派生，batched 计时）。P6：`evaluation/metrics.py`（UtilsForecast `evaluate`→4 核心 metrics long + ranking wide）+ `artifacts/writer.py`（5 CSV + manifest + run_config）+ `orchestration/run.py` + CLI `run`/`backtest`/`--dry-run`。
+- 关键决策：CLI 用 stdlib argparse；`metrics.csv` long form（`run_id,backend,model,metric,value`），`model_comparison.csv` 由其 pivot+排名+join 耗时；计时 batch-shared（StatsForecast 一次 fit 多模型，runtime_metrics 每模型复用同一计时，文档化）；`run_dir = output_dir/run_id`。
+- 修复点：data loader 空 DataFrame 标量赋值导致 `unique_id` 为 NaN（改 `index=range(n)` 预建行数）；`yaml.safe_dump` 不接受 `allow_nan`（移除）；logging 单测在集成测试污染全局 logger/env 后失败（autouse fixture 重置 env + 清默认 logger handler；lazy 保证改用 subprocess 进程隔离验证，避免 pytest `LogCaptureHandler` 干扰）。
+- 涉及文件：`src/tsforecasting/{config,data,models,evaluation,artifacts,orchestration,utils,cli}/**`、`configs/examples/ett_small_stats.yaml`、`tests/unit/test_{config,data_loader,registry,stats_backend,logging}.py`、`tests/integration/test_run_smoke.py`。
+- 验证命令：
+
+```bash
+uv run tsforecasting validate-config --config configs/examples/ett_small_stats.yaml
+uv run tsforecasting run --config configs/examples/ett_small_stats.yaml
+uv run pytest -q          # 40 passed
+uv run ruff check .       # All checks passed
+```
+
+- 结果：通过。端到端 `run` 在 ETTh1 上产出 7 个 artifact；`auto_ets`（mae=1.054, rank1）胜 `seasonal_naive`（mae=1.42）；manifest 含全部 provenance 键。MVP-0 成功标准全部达成。
+- 下一步：MVP-1（P7 MLForecast、P8 NeuralForecast CPU smoke、P9 TourismSmall 层级验证）。
+
+## 2026-06-23 - P1 工程脚手架与 dependency spike
+
+- 类型：impl（mvp-0 / P1）
+- 摘要：开 `feat/mvp-0-statsforecast` 分支，落地 MVP-0 工程脚手架并跑通 dependency spike 闸门。重写 `pyproject.toml`（hatchling + `src/` 布局、`[project.scripts] tsforecasting`、base=`statsforecast`/`utilsforecast`/`pyyaml`/`numpy`/`pandas`、extras `ml`/`neural`/`hierarchical`/`plot`、dev=`pytest`/`ruff`、ruff+pytest 配置）。Vendor `utils/log_util.py` 行为契约到 `src/tsforecasting/utils/logging.py`：lazy（首调 `get_logger()` 才建 handler/mkdir）、幂等（不重复挂 handler）、日志根目录 CWD 相对、保留 `SERVICE_LOG_LEVEL`/`LOG_NAME`。argparse CLI 骨架暴露 `validate-config`/`run`/`backtest`（run/backtest 含 `--run-id`/`--output-dir`/`--log-name`/`--log-level`/`--dry-run`）。下载完整 `examples/ett_small/ETTh1.csv`。
+- dependency spike 结论（关键）：
+  - `statsforecast` 与 `utilsforecast` 上游硬钉 `pandas<3.0.0`（已核实 main 分支 pyproject），原 `pandas>=3.0.3` 无法解析 → pin `pandas>=2.2,<3`（解析为 2.3.3）。
+  - `statsforecast 2.0.3` 经 marker 在 py3.12 上传递依赖 `numba>=0.55.0`；numba 0.65.1 钉 `numpy<2.5`，而项目 resolver 默认取最新 `numpy 2.5.0` 导致 (numba, numpy) 冲突并错误回退到 `statsforecast 0.7.1`（numba 0.53.1 / llvmlite 0.36.0 在 py3.12 构建失败）→ pin `numpy>=1.26,<2.5`（解析为 2.4.6）。
+  - 最终解析：`statsforecast 2.0.3` / `utilsforecast 0.2.16` / `pandas 2.3.3` / `numpy 2.4.6` / `numba 0.65.1` / `llvmlite 0.47.0` / `scipy 1.15.3`。pandas-3 升级单列为后续独立任务。
+- 涉及文件：
+  - `pyproject.toml`
+  - `uv.lock`
+  - `.gitignore`
+  - `examples/ett_small/ETTh1.csv`
+  - `src/tsforecasting/__init__.py`
+  - `src/tsforecasting/utils/__init__.py`、`src/tsforecasting/utils/logging.py`
+  - `src/tsforecasting/cli/__init__.py`
+  - `tests/__init__.py`、`tests/unit/__init__.py`、`tests/integration/__init__.py`、`tests/unit/test_logging.py`
+- 验证命令：
+
+```bash
+uv sync
+uv run python -c "from statsforecast import StatsForecast; from statsforecast.models import SeasonalNaive, AutoETS; from utilsforecast.evaluation import evaluate; from utilsforecast.losses import mae, rmse, mape, smape; print('ok')"
+uv run tsforecasting --help
+uv run tsforecasting run --help
+uv run pytest -q
+```
+
+- 结果：通过。`uv sync` 解析 statsforecast 2.0.3（pandas 2.3.3 / numpy 2.4.6 / numba 0.65.1）；导入与 SeasonalNaive 微 forecast 正常；`tsforecasting --help` 列出三子命令；`pytest` 7 passed（logging：lazy、幂等、env 生效、不传播）。
+- 下一步：P2 — YAML schema + `validate-config` + run_id/seed。
+
 ## 2026-06-23 - 知识入口 neat-freak 同步
 
 - 类型：docs
