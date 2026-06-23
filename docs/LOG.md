@@ -9,6 +9,58 @@
 - 具体计划项状态记录在 `docs/PLAN.md` 的“计划项实现记录”。
 - 日志条目应包含日期、类型、摘要、涉及文件、验证命令、结果和下一步。
 
+## 2026-06-23 - P9 TourismSmall hierarchical reconciliation 完成（MVP-1 收尾）
+
+- 类型：impl（mvp-1 / P9）
+- 摘要：接入 TourismSmall 层级协调，**独立流程**（不复用 MVP-0 `Config`/`run_pipeline`，因数据源、配置结构与 artifact 契约均不同）。新增 `config/hierarchical.py`（`HierarchicalConfig`：`data.source/dataset/freq/cache_dir`、`base_forecast.backend/models/horizon`、`hierarchical.reconcilers/diagnostics`、`evaluation` 限 `[mse]`；不复用 `Config`，但复用 `ModelConfig`/`RuntimeConfig`/`ArtifactsConfig` 与 schema 的私有 builder）；`data/hierarchical.py`（`load_hierarchical` 取 `Y_df/S_df/tags` 并 `S_df.reset_index(names="unique_id")`）；`reconciliation.py`（`reconcile_pipeline`：StatsForecast wide base forecast → 逐 reconciler `HierarchicalReconciliation.reconcile` → coherence 自验 `S(nodes×bottom)@y_bottom ≈ y_rec`（atol 1e-6）+ mse vs hold-out；reconciler 用 importlib 从 `{name,class,params}` spec 实例化，**不进 REGISTRY**，同 MLForecast target_transforms 模式）；`orchestration/reconcile.py`（`run_reconciliation`：hold-out `horizon` 步 split + 全流程 + 写 artifact/manifest/run_config）；`artifacts/{schema,writer,__init__}` 增 `base_predictions`/`reconciled_predictions`/`reconciliation_diagnostics` 三契约 + hierarchical manifest；CLI 新增 `reconcile` 子命令（+run-level overrides/`--dry-run`）；示例 `configs/examples/tourism_small_hierarchical.yaml`（`seasonal_naive` base + BottomUp/MinTrace/TopDown/MiddleOut）。
+- hierarchicalforecast 1.5.1 / datasetsforecast 1.0.1 spike 结论（关键）：
+  - TourismSmall 实测**季度 `QE-DEC`**——v2 §8 的 `freq: QE` 正确（WebSearch 误指 monthly，已忽略）。
+  - `HierarchicalData.load(directory, group, cache)` **实际返回 3 值 (Y_df, S_df, tags)**，签名标注错为 2 元组；`group="TourismSmall"`。
+  - `S_df` 节点名在 index（`reset_index` 前无 `unique_id` 列），`reconcile` 要求 `unique_id` 为列 → adapter 内 `reset_index(names="unique_id")`。
+  - `tags` 4 层 key：`Country`(1)/`Country/Purpose`(4)/`Country/Purpose/State`(28)/`Country/Purpose/State/CityNonCity`(56 bottom)，正是 v2 §8 MiddleOut `middle_level` 合法取值。
+  - reconciler 构造：`BottomUp` 无参；`MinTrace(method=...)` method 必填；`TopDown(method=...)` 必填；`MiddleOut(middle_level, top_down_method)` 都必填。
+  - **`top_down_method` 合法值 = `average_proportions`/`forecast_proportions`/`proportion_averages`**；`avg_proportions` 非法。v2 §8 原写 `avg_proportions`（P0.3 误把合法的 `proportion_averages` 当非法、改成非法的 `avg_proportions`）→ 本轮修回 `average_proportions` 并更新合法值清单（同步 §8 + §11 调整记录）。
+  - `reconcile(..., diagnostics=True)` 原生做 coherence 验证；reconcile 输出 wide，列名 `{base_alias}/{reconciler}_{param}-{value}`（MiddleOut 的 middle_level 值含 `/` 故用 `split("/",1)[0]` 取 base_alias），逐 reconciler 单独 reconcile 以便用配置的 `spec.name` 标 reconciler 列。
+- 关键决策（用户四问四答）：(1) **独立形态**（新 `reconcile` 子命令 + 独立 config/pipeline/artifacts，不污染 MVP-0）；(2) **base 复用现有 `seasonal_naive`/`auto_ets`**（零 registry 改动，不为 P9 扩 naive/auto_arima）；(3) **4 个 reconciler 含 MinTrace**（业界标杆，spike 验证可用）；(4) **指标 `[mse]`**（忠于 v2 §8，不擅自扩展）。
+- 涉及文件：`src/tsforecasting/config/hierarchical.py`（新）、`src/tsforecasting/data/hierarchical.py`（新）、`src/tsforecasting/reconciliation.py`（新）、`src/tsforecasting/orchestration/reconcile.py`（新）、`src/tsforecasting/artifacts/{schema,writer,__init__}.py`、`src/tsforecasting/data/__init__.py`、`src/tsforecasting/orchestration/__init__.py`、`src/tsforecasting/cli/__init__.py`、`configs/examples/tourism_small_hierarchical.yaml`（新）、`tests/unit/test_hierarchical.py`（新）、`tests/unit/test_reconciliation.py`（新）、`tests/integration/test_reconcile_smoke.py`（新）、`.gitignore`（`datasetsforecast_cache/`）、`docs/unified-ts-framework-plan-v2.md`（§8 top_down_method + §11 记录）。
+- 验证命令：
+
+```bash
+uv sync --extra hierarchical
+uv run tsforecasting reconcile --config configs/examples/tourism_small_hierarchical.yaml --dry-run
+uv run tsforecasting reconcile --config configs/examples/tourism_small_hierarchical.yaml
+uv run pytest -q          # hierarchical env：65 passed, 3 skipped；base env（uv sync）：59 passed, 6 skipped
+uv run ruff check .       # All checks passed
+```
+
+- 结果：通过（TDD：contract→config→reconciliation→integration 四轮 RED-GREEN）。真实 reconcile on TourismSmall：89 series / 3204 rows / 4 levels，hold-out split train/test=2848/356（horizon=4），产出 5 个 artifact（3 CSV + manifest + run_config）；`reconciliation_diagnostics.csv` 四 reconciler 全 `coherent=True`，`middle_out_state` mse=674088 最优（< bottom_up/top_down/min_trace 的 677674）；manifest 含 4 层 `hierarchy_levels` 与 4 个 reconciler provenance。单元测试用合成 2 层层级（total=b1+b2）验证 reconcile+coherence+mse 逻辑、不下载。base env（无 hierarchical extra）base 包仍可 import（含 `run_reconciliation` 路径）、hierarchical/neural/ml 测试跳过，lazy-import 不变量成立。**MVP-1（P7-P9）全部达成**。
+- 下一步：MVP-1 完成。P10 reporting（Phase 2，非阻塞）；P11 阶段性 smoke 验收与文档同步；之后可进入 Phase 2（full catalog / Jupyter reporting / 更多模型）。
+
+## 2026-06-23 - P8 NeuralForecast CPU smoke backend 完成（MVP-1）
+
+- 类型：impl（mvp-1 / P8）
+- 摘要：接入 NeuralForecast CPU smoke 后端，进入统一 metrics/comparison。`config/schema.py` `SUPPORTED_BACKENDS` 增 `neuralforecast`（**无顶层 section**——与 MLForecast 不同，NeuralForecast 的训练超参挂在每个模型实例上，走现有 `models[].params` → `build_model(cls(**params))` 路径）。`models/registry.py` 注册 `nhits`+`nbeats` 两个 preset（`dependency_group="neural"`、`class_path` 指向 `neuralforecast.models.NHITS`/`NBEATS`、`model_type="neural"`）。新增 `models/nixtla/neural.py` `NeuralForecastAdapter`，逐行镜像 `StatsForecastAdapter`/`MLForecastAdapter`：相同 `predict`/`cross_validation` surface、wide→long melt、按列序位置映射 model 名、dense-rank `horizon` 派生、batched 计时；复用 stats.py 的 `NON_MODEL_COLS_*`。`orchestration/run.py` `_build_adapter` 增 `neuralforecast` 分支（lazy import，签名同 StatsForecastAdapter，无额外 config）。不改 CLI、不改 manifest 结构（模型已带 `backend`）。新示例 `configs/examples/ett_small_neural.yaml`（statsforecast `seasonal_naive` + `nhits`，`h:24`/`input_size:48`/`max_steps:50`/`enable_progress_bar:false`/`random_seed:0`）。
+- neuralforecast 3.1.9 API spike 结论（关键）：
+  - `NeuralForecast(models, freq, ...)` 构造只需 `freq`（adapter 接 `loaded.meta["freq"]`），训练超参（`h`/`input_size`/`max_steps`/`enable_progress_bar`/`random_seed`）都在模型实例上。
+  - `inspect.signature` 显示 NHITS/NBEATS 的 `trainer_kwargs` 为必填，但实测 `NHITS(h=24, input_size=48, max_steps=5)` 可正常构造（内部有默认）；`enable_progress_bar=False` 作为模型参数被接受（保持 pytest 输出干净）。
+  - `predict(df=None, h=None, ...)` 与 `cross_validation(df=None, h=None, n_windows=1, step_size=1, val_size=0, refit=False, ...)` **都接受 `h`** → adapter 显式传 `h`（解决「predict 长度由模型 h 决定」的歧义，统一用 config 的 horizon）。
+  - `val_size` 默认 0；adapter 给 `fit` 与 `cross_validation` 都传 `val_size=h`，开始处理 NeuralForecast 验证语义但不改 MVP-0 backtest 契约。
+  - 依赖：`neuralforecast 3.1.9` / `torch 2.12.1`（Mac MPS 可用），`uv sync --extra neural` 无版本冲突（P1 spike 已锁 `pandas<3`/`numpy<2.5`）。
+- 关键决策（用户三问三答均选 A）：(1) 配置形态=模型级参数无顶层 section（因 NeuralForecast 超参挂模型实例，非 MLForecast 那种框架共享 lags）；(2) 验证=现在 `uv sync --extra neural` + 全量 smoke；(3) 预设=注册 `nhits`+`nbeats` 两个、smoke 只跑 `nhits`。device 不强制 CPU（MPS 可用），测试靠 `seed`/`random_seed`+小 `max_steps` 保证可复现。
+- 涉及文件：`src/tsforecasting/config/schema.py`、`src/tsforecasting/models/registry.py`、`src/tsforecasting/models/nixtla/neural.py`（新）、`src/tsforecasting/orchestration/run.py`、`configs/examples/ett_small_neural.yaml`（新）、`tests/unit/test_neural_backend.py`（新）、`tests/unit/test_registry.py`、`tests/unit/test_config.py`。
+- 验证命令：
+
+```bash
+uv sync --extra neural
+uv run tsforecasting validate-config --config configs/examples/ett_small_neural.yaml
+uv run tsforecasting run --config configs/examples/ett_small_neural.yaml
+uv run pytest -q          # neural env：50 passed, 3 skipped；base env（uv sync）：47 passed, 4 skipped
+uv run ruff check .       # All checks passed
+```
+
+- 结果：通过（TDD：config→registry→adapter 三轮 RED-GREEN）。混合 run 在 ETTh1 产出 7 个 artifact；`model_comparison.csv` 跨 backend 统一排名——`nhits`（neuralforecast）mae=0.938 rank1 胜 `seasonal_naive`（statsforecast）mae=1.422 rank2；训练 `Trainer.fit stopped: max_steps=50 reached`（受控）；`runtime_metrics` 按 backend 分别计时（nhits ~4.0s 含 fit 2.4s + cv 1.6s，seasonal_naive ~0.02s）；48 prediction rows（24×2）、144 backtest rows（24×3×2）。base env（无 neural extra）base 包仍可 import、neural/ml 测试跳过，lazy-import 不变量成立。skip 计数差异（neural env 3 vs base env 4）由模块级 `importorskip` 在 neuralforecast 缺失时把 3 个 neural 测试折叠为 1 个 skip item 造成，行为正确。
+- 下一步：P9 TourismSmall hierarchical reconciliation（加载 `Y_df`/`S_df`/`tags`，调用 HierarchicalForecast reconciliation，保存 base/reconciled forecasts 与 coherence diagnostics）。
+
 ## 2026-06-23 - P7 MLForecast backend 完成（MVP-1）
 
 - 类型：impl（mvp-1 / P7）

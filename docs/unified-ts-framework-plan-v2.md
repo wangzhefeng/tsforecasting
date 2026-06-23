@@ -334,7 +334,7 @@ reports/{run_id}/
 
 ## 8. TourismSmall 层级配置草案
 
-TourismSmall 不属于 MVP-0，进入 MVP-1。配置必须显式表达 reconciler 参数，不能只写模糊字符串；所有参数取值（如 `top_down_method`）必须对齐当前版本 `hierarchicalforecast/methods.py` 的合法字符串，例如 `top_down_method` 只接受 `avg_proportions` 或 `forecast_proportions`。
+TourismSmall 不属于 MVP-0，进入 MVP-1。配置必须显式表达 reconciler 参数，不能只写模糊字符串；所有参数取值（如 `top_down_method`）必须对齐当前版本 `hierarchicalforecast/methods.py` 的合法字符串，例如 `top_down_method` 只接受 `average_proportions`、`forecast_proportions` 或 `proportion_averages`（对齐 hierarchicalforecast 1.5.1 `methods.py`）。
 
 ```yaml
 data:
@@ -364,7 +364,7 @@ hierarchical:
       class: MiddleOut
       params:
         middle_level: Country/Purpose/State
-        top_down_method: avg_proportions
+        top_down_method: average_proportions
   diagnostics: true
 
 evaluation:
@@ -424,6 +424,7 @@ Phase 2 验收：
 | 2026-06-23 | 评审修订：新增依赖 extras 分组 + logging vendor 写死 | 阶段边界需在依赖层硬隔离（neuralforecast 的 torch 不应进核心），且 P1 logging 迁移边界此前未定 | §4 增加 base/[ml]/[neural]/[hierarchical]/dev 分组；P1 将 `log_util` vendor 进 `src/tsforecasting/utils/logging.py` 并改 lazy handler |
 | 2026-06-23 | 评审修订：补 MVP-0 CLI 语义、输出契约派生规则、可复现性字段 | `run`/`backtest`/`predict` 语义未定义；`horizon`/`rank_metric`/`seed`/`run_id` 缺规则 | §5.2 钉死 MVP-0 CLI=`validate-config`+`run`；§7 标注 `horizon` 派生、`rank_metric` 默认 mae；manifest 增 `seed`/`run_id`；`metrics.json` 推迟 MVP-0b |
 | 2026-06-23 | 评审修订：TourismSmall MiddleOut 参数取值修正 + pandas 3.x 兼容风险 | `top_down_method: proportion_averages` 非合法值；pandas 3.x 与 Nixtla 兼容性未验证 | §8 改为 `avg_proportions` 并要求对齐 `methods.py`；§10 + P1 dependency spike 兜底 pin `pandas<3` |
+| 2026-06-23 | P9 实测修正 `top_down_method` 合法值 | `avg_proportions` 在 hierarchicalforecast 1.5.1 实测非法；合法值为 `average_proportions`/`forecast_proportions`/`proportion_averages`（P0.3 误把合法的 `proportion_averages` 当非法、改成非法的 `avg_proportions`） | §8 `top_down_method` 改回 `average_proportions`，合法值清单更新为三选 |
 
 ## 12. 参考资料
 

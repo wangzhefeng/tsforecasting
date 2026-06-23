@@ -1,0 +1,52 @@
+# P9 example: TourismSmall hierarchical reconciliation (quarterly, QE).
+# base forecasts reuse the existing statsforecast SeasonalNaive preset; four
+# reconcilers (BottomUp / MinTrace / TopDown / MiddleOut) flow into one
+# reconciliation_diagnostics.csv. MiddleOut's top_down_method uses the
+# hierarchicalforecast 1.5.1-legal `average_proportions` (NOT `avg_proportions`).
+data:
+  source: datasetsforecast
+  dataset: TourismSmall
+  freq: QE
+  cache_dir: datasetsforecast_cache   # downloaded once, gitignored
+
+base_forecast:
+  backend: statsforecast
+  horizon: 4
+  models:
+    - name: seasonal_naive
+      params:
+        season_length: 4
+
+hierarchical:
+  reconcilers:
+    - name: bottom_up
+      class: hierarchicalforecast.methods.BottomUp
+      params: {}
+    - name: min_trace_ols
+      class: hierarchicalforecast.methods.MinTrace
+      params:
+        method: ols
+    - name: top_down_forecast_proportions
+      class: hierarchicalforecast.methods.TopDown
+      params:
+        method: forecast_proportions
+    - name: middle_out_state
+      class: hierarchicalforecast.methods.MiddleOut
+      params:
+        middle_level: Country/Purpose/State
+        top_down_method: average_proportions
+  diagnostics: true
+
+evaluation:
+  metrics: [mse]
+
+runtime:
+  collect_timing: true
+  log_name: tourism_small_hierarchical
+  log_level: INFO
+
+artifacts:
+  output_dir: runs/tourism_small_hierarchical
+  save_plots: false
+
+seed: 0

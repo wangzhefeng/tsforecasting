@@ -16,9 +16,15 @@ import yaml
 
 from tsforecasting.artifacts.schema import validate_columns
 from tsforecasting.config import Config
+from tsforecasting.config.hierarchical import HierarchicalConfig
 from tsforecasting.models.registry import BuiltModel
 
 _CSV_ARTIFACTS = ["backtest_predictions", "metrics", "runtime_metrics", "model_comparison"]
+_HIERARCHICAL_CSV_ARTIFACTS = [
+    "base_predictions",
+    "reconciled_predictions",
+    "reconciliation_diagnostics",
+]
 
 
 def write_artifacts(
@@ -130,3 +136,72 @@ def write_run_config(config: Config, run_dir: Path) -> None:
     (run_dir / "run_config.yaml").write_text(
         yaml.safe_dump(payload, sort_keys=False), encoding="utf-8"
     )
+
+
+def write_hierarchical_artifacts(
+    run_dir: Path,
+    *,
+    base_predictions: pd.DataFrame,
+    reconciled_predictions: pd.DataFrame,
+    reconciliation_diagnostics: pd.DataFrame,
+) -> None:
+    """Validate and write the three P9 reconciliation CSV artifacts."""
+    run_dir.mkdir(parents=True, exist_ok=True)
+    frames = {
+        "base_predictions": base_predictions,
+        "reconciled_predictions": reconciled_predictions,
+        "reconciliation_diagnostics": reconciliation_diagnostics,
+    }
+    for name, df in frames.items():
+        validate_columns(df, name)
+        df.to_csv(run_dir / f"{name}.csv", index=False)
+
+
+def build_hierarchical_manifest(
+    config: HierarchicalConfig,
+    loaded_meta: dict[str, Any],
+    run_dir: Path,
+) -> dict[str, Any]:
+    """Assemble the hierarchical run manifest (provenance, hierarchy, artifacts)."""
+    artifacts = {
+        name: str((run_dir / f"{name}.csv").resolve())
+        for name in _HIERARCHICAL_CSV_ARTIFACTS
+    }
+    return {
+        "run_id": config.run_id,
+        "run_id_rule": "tsforecasting-<UTC YYYYmmddHHMMSS>-<sha8>",
+        "config_source": config.config_source,
+        "run_command": " ".join(sys.argv),
+        "seed": config.seed,
+        "data": {
+            "source": config.data.source,
+            "dataset": config.data.dataset,
+            "freq": config.data.freq,
+            "cache_dir": config.data.cache_dir,
+        },
+        "hierarchy_levels": dict(loaded_meta["levels"]),
+        "n_series": loaded_meta["n_series"],
+        "n_rows": loaded_meta["n_rows"],
+        "base_forecast": {
+            "backend": config.base_forecast.backend,
+            "horizon": config.base_forecast.horizon,
+            "models": [
+                {"name": m.name, "params": m.params} for m in config.base_forecast.models
+            ],
+        },
+        "reconcilers": [
+            {"name": r.name, "class": r.class_path, "params": r.params}
+            for r in config.hierarchical.reconcilers
+        ],
+        "diagnostics": config.hierarchical.diagnostics,
+        "evaluation": {"metrics": config.evaluation.metrics},
+        "artifacts": artifacts,
+        "log_path": str((Path("logs") / config.runtime.log_name).resolve()),
+        "env": {
+            "python": sys.version.split()[0],
+            "platform": platform.platform(),
+            "SERVICE_LOG_LEVEL": os.environ.get("SERVICE_LOG_LEVEL"),
+            "LOG_NAME": os.environ.get("LOG_NAME"),
+        },
+        "created_at_utc": datetime.now(timezone.utc).isoformat(),
+    }

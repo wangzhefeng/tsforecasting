@@ -46,6 +46,13 @@ def _build_parser() -> argparse.ArgumentParser:
     p_backtest.add_argument("--config", required=True)
     _add_run_overrides(p_backtest)
 
+    p_reconcile = sub.add_parser(
+        "reconcile",
+        help="Hierarchical reconciliation (P9: TourismSmall).",
+    )
+    p_reconcile.add_argument("--config", required=True)
+    _add_run_overrides(p_reconcile)
+
     return parser
 
 
@@ -121,6 +128,51 @@ def _cmd_backtest(args: argparse.Namespace) -> int:
     return 0
 
 
+def _load_and_resolve_hierarchical(args: argparse.Namespace) -> object | None:
+    from tsforecasting.config.hierarchical import (
+        ConfigError,
+        load_hierarchical_config,
+        resolve_hierarchical_overrides,
+    )
+
+    try:
+        config = load_hierarchical_config(args.config)
+    except ConfigError as exc:
+        print(f"config invalid: {exc}", file=sys.stderr)
+        return None
+    resolve_hierarchical_overrides(
+        config,
+        run_id=args.run_id,
+        output_dir=args.output_dir,
+        log_name=args.log_name,
+        log_level=args.log_level,
+    )
+    return config
+
+
+def _print_dry_run_hierarchical(label: str, config: object) -> None:
+    print(f"dry-run plan ({label}):")
+    print(f"  run_id:      {config.run_id}")
+    print(f"  output_dir:  {config.artifacts.output_dir}")
+    print(f"  dataset:     {config.data.dataset}")
+    print(f"  base models: {[m.name for m in config.base_forecast.models]}")
+    print(f"  reconcilers: {[r.name for r in config.hierarchical.reconcilers]}")
+
+
+def _cmd_reconcile(args: argparse.Namespace) -> int:
+    from tsforecasting.orchestration import run_reconciliation
+
+    config = _load_and_resolve_hierarchical(args)
+    if config is None:
+        return 1
+    if args.dry_run:
+        _print_dry_run_hierarchical("reconcile", config)
+        return 0
+    run_dir = run_reconciliation(config)
+    print(f"reconciliation complete: {run_dir}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -128,6 +180,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "validate-config": _cmd_validate_config,
         "run": _cmd_run,
         "backtest": _cmd_backtest,
+        "reconcile": _cmd_reconcile,
     }
     return dispatch[args.command](args)
 

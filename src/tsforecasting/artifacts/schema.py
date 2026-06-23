@@ -48,12 +48,33 @@ MODEL_COMPARISON_COLUMNS = [
     "rank",
 ]
 
+# P9 hierarchical reconciliation artifacts (independent of the MVP-0 contracts).
+BASE_PREDICTIONS_COLUMNS = ["unique_id", "ds", "yhat", "model", "run_id"]
+RECONCILED_PREDICTIONS_COLUMNS = [
+    "unique_id",
+    "ds",
+    "yhat",
+    "base_model",
+    "reconciler",
+    "run_id",
+]
+RECONCILIATION_DIAGNOSTICS_COLUMNS = [
+    "run_id",
+    "base_model",
+    "reconciler",
+    "coherent",
+    "mse",
+]
+
 ARTIFACT_CONTRACTS = {
     "predictions": PREDICTIONS_COLUMNS,
     "backtest_predictions": BACKTEST_PREDICTIONS_COLUMNS,
     "metrics": METRICS_COLUMNS,
     "runtime_metrics": RUNTIME_METRICS_COLUMNS,
     "model_comparison": MODEL_COMPARISON_COLUMNS,
+    "base_predictions": BASE_PREDICTIONS_COLUMNS,
+    "reconciled_predictions": RECONCILED_PREDICTIONS_COLUMNS,
+    "reconciliation_diagnostics": RECONCILIATION_DIAGNOSTICS_COLUMNS,
 }
 
 
