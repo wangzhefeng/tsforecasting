@@ -9,6 +9,37 @@
 - 具体计划项状态记录在 `docs/PLAN.md` 的“计划项实现记录”。
 - 日志条目应包含日期、类型、摘要、涉及文件、验证命令、结果和下一步。
 
+## 2026-06-23 - P11 阶段验收（MVP-0 / MVP-1 / Phase 2 首次全验收）
+
+- 类型：acceptance（continuous / P11）
+- 摘要：对已完成的 MVP-0（P1–P6）、MVP-1（P7–P9）、Phase 2 reporting（P10）做一次完整 smoke 验收，确认端到端可用、测试全绿。验收范围对照 plan §9 验收清单。
+- 验收命令（全 extra env）：
+
+```bash
+uv sync --extra ml --extra neural --extra hierarchical --extra report --extra plot
+# validate-config ×4
+uv run tsforecasting validate-config --config configs/examples/ett_small_stats.yaml
+uv run tsforecasting validate-config --config configs/examples/ett_small_ml.yaml
+uv run tsforecasting validate-config --config configs/examples/ett_small_neural.yaml
+uv run tsforecasting reconcile --config configs/examples/tourism_small_hierarchical.yaml --dry-run
+# 端到端 smoke
+uv run tsforecasting run --config configs/examples/ett_small_stats.yaml --run-id p11-stats --output-dir /tmp/p11
+uv run tsforecasting run --config configs/examples/ett_small_ml.yaml --run-id p11-ml --output-dir /tmp/p11
+uv run tsforecasting run --config configs/examples/ett_small_neural.yaml --run-id p11-neural --output-dir /tmp/p11
+uv run tsforecasting reconcile --config configs/examples/tourism_small_hierarchical.yaml --run-id p11-hier --output-dir /tmp/p11
+uv run pytest -q          # 79 passed, 0 skipped（全 extra，无 skip）
+uv run ruff check .       # All checks passed
+```
+
+- 验收结果（对照 plan §9）：
+  - **MVP-0**：`validate-config` ett_small_stats ✓；canonical 数据契约测试（无 `id_col`/重复时间戳/freq 缺失）✓（test_data_loader）；`run` ett_small_stats 产 7 artifact + `auto_ets` rank1 ✓；manifest 含完整 provenance ✓。
+  - **MVP-1**：`run` ett_small_ml 跨 backend 排名（stats + ml）✓；`run` ett_small_neural CPU smoke `Trainer.fit stopped: max_steps=50`（训练步数受控）+ 跨 backend 排名 ✓；`reconcile` tourism_small_hierarchical 产 3 artifact + 4 reconciler `coherent=True` ✓。
+  - **Phase 2**：`report` 生成 `model_comparison.ipynb` / `reconciliation.ipynb`（P10）✓。
+  - **Phase 2 余项（未做，不阻塞）**：full Nixtla model catalog、四项目架构诊断报告、概率预测/区间指标、可选 HTML 导出（`nbconvert`）。
+- 关键事实：全 extra env `pytest` **79 passed / 0 skipped**（neural/ml/hierarchical/report 测试全跑）；`ruff` clean。各 extra env 单独验证（见 P7/P8/P9 LOG）：base env 59p/6s、hierarchical env 65p/3s、neural env 50p/3s、ml env 51p。lazy-import 不变量始终成立（base `uv sync` 包可 import，optional backend 测试 skip）。
+- 涉及文件：无代码改动，仅 `docs/PLAN.md`（P11 → done）、本日志。
+- 下一步：P11 是持续项，后续每个阶段完成后再跑对应 smoke；Phase 2 余项按需推进。MVP-0 + MVP-1 + Phase 2 reporting 全部交付。
+
 ## 2026-06-23 - P10 notebook reporting 完成（Phase 2）
 
 - 类型：impl（phase-2 / P10）
