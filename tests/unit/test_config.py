@@ -120,6 +120,22 @@ def test_mlforecast_bad_target_transforms_raises(tmp_path: Path) -> None:
         load_config(_write(tmp_path, data))
 
 
+def test_neuralforecast_backend_loads_without_top_level_section(tmp_path: Path) -> None:
+    # Unlike mlforecast, neuralforecast carries its hyperparams per-model, so no
+    # top-level section is required.
+    data = _base()
+    data["models"].append(
+        {
+            "name": "nhits",
+            "backend": "neuralforecast",
+            "params": {"h": 24, "input_size": 48, "max_steps": 5},
+        }
+    )
+    config = load_config(_write(tmp_path, data))
+    assert config.models[-1].backend == "neuralforecast"
+    assert config.models[-1].params["h"] == 24
+
+
 def test_unsupported_metric_raises(tmp_path: Path) -> None:
     data = _base()
     data["evaluation"]["metrics"] = ["mae", "mase"]

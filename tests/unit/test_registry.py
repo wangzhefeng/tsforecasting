@@ -57,6 +57,14 @@ def test_registry_contains_mlforecast_presets() -> None:
     assert all(e.class_path.startswith("sklearn.") for e in ml_entries)
 
 
+def test_registry_contains_neuralforecast_presets() -> None:
+    neural_entries = [e for e in REGISTRY if e.backend == "neuralforecast"]
+    names = {e.model_name for e in neural_entries}
+    assert {"nhits", "nbeats"} <= names
+    assert all(e.dependency_group == "neural" for e in neural_entries)
+    assert all(e.class_path.startswith("neuralforecast.models.") for e in neural_entries)
+
+
 def test_get_entry_known_and_unknown() -> None:
     assert get_entry("seasonal_naive").class_path == "statsforecast.models.SeasonalNaive"
     with pytest.raises(RegistryError, match="not in registry"):

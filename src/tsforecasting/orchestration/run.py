@@ -35,6 +35,10 @@ def _build_adapter(backend: str, df, group, freq: str, run_id: str, config: Conf
         from tsforecasting.models.nixtla.ml import MLForecastAdapter
 
         return MLForecastAdapter(df, group, freq, run_id, config.mlforecast)
+    if backend == "neuralforecast":
+        from tsforecasting.models.nixtla.neural import NeuralForecastAdapter
+
+        return NeuralForecastAdapter(df, group, freq, run_id)
     raise ValueError(f"no adapter registered for backend '{backend}'")
 
 

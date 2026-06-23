@@ -114,6 +114,28 @@ REGISTRY: list[RegistryEntry] = [
         status="mvp_smoke",
         dependency_group="ml",
     ),
+    # NeuralForecast CPU-smoke presets (MVP-1). class_path targets the neural
+    # model class; build_model instantiates it via cls(**params) (params carry
+    # h / input_size / max_steps) and the NeuralForecastAdapter wraps the
+    # instances in one NeuralForecast framework object.
+    RegistryEntry(
+        backend="neuralforecast",
+        model_name="nhits",
+        class_path="neuralforecast.models.NHITS",
+        model_type="neural",
+        mvp_preset=True,
+        status="mvp_smoke",
+        dependency_group="neural",
+    ),
+    RegistryEntry(
+        backend="neuralforecast",
+        model_name="nbeats",
+        class_path="neuralforecast.models.NBEATS",
+        model_type="neural",
+        mvp_preset=True,
+        status="mvp_smoke",
+        dependency_group="neural",
+    ),
 ]
 
 

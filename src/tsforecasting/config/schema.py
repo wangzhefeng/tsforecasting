@@ -16,7 +16,7 @@ from typing import Any
 
 import yaml
 
-SUPPORTED_BACKENDS = frozenset({"statsforecast", "mlforecast"})
+SUPPORTED_BACKENDS = frozenset({"statsforecast", "mlforecast", "neuralforecast"})
 CORE_METRICS = frozenset({"mae", "rmse", "mape", "smape"})
 VALID_LOG_LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
 
