@@ -200,11 +200,46 @@ def build_hierarchical_notebook(run_dir: str | Path, run_id: str) -> Any:
     return nb
 
 
+def to_html(notebook_path: str | Path) -> Path:
+    """Execute the notebook and export to a self-contained HTML file (nbconvert).
+
+    Raises on execution failure (missing data, kernel, or matplotlib); callers
+    catch and degrade. Requires the ``[report]`` extra (nbconvert).
+    """
+    from nbconvert import HTMLExporter
+    from nbconvert.preprocessors import ExecutePreprocessor
+
+    notebook_path = Path(notebook_path)
+    nb = nbf.read(str(notebook_path), as_version=4)
+    ep = ExecutePreprocessor(timeout=600, kernel_name="python3")
+    try:
+        ep.preprocess(nb, {"metadata": {"path": str(notebook_path.parent)}})
+    except Exception as exc:  # noqa: BLE001 - surface a friendly hint on missing kernel
+        if type(exc).__name__ == "NoSuchKernel":
+            raise ImportError(
+                "no 'python3' Jupyter kernel; install it via "
+                "`python -m ipykernel install --sys-prefix --name python3`"
+            ) from exc
+        raise
+    body, _ = HTMLExporter().from_notebook_node(nb)
+    html_path = notebook_path.with_suffix(".html")
+    html_path.write_text(body, encoding="utf-8")
+    return html_path
+
+
 def generate_report(
-    run_dir: str | Path, output_dir: str | Path = "reports"
+    run_dir: str | Path,
+    output_dir: str | Path = "reports",
+    *,
+    html: bool = False,
 ) -> Path:
-    """Detect run type, build the matching notebook, write it under ``output_dir/run_id``."""
-    run_dir = Path(run_dir)
+    """Detect run type, build the matching notebook, write it under ``output_dir/run_id``.
+
+    If ``html``, also execute the notebook and export a self-contained HTML
+    report (needs the ``[report]`` extra's nbconvert; on failure the notebook
+    is still written and the HTML error propagates to the caller).
+    """
+    run_dir = Path(run_dir).resolve()
     run_id = _read_run_id(run_dir)
     rtype = detect_run_type(run_dir)
     if rtype == "mvp0":
@@ -217,4 +252,6 @@ def generate_report(
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / name
     nbf.write(nb, out)
+    if html:
+        to_html(out)
     return out

@@ -59,6 +59,9 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_report.add_argument("--run-dir", required=True)
     p_report.add_argument("--output-dir", default="reports")
+    p_report.add_argument(
+        "--html", action="store_true", help="Also execute and export HTML (nbconvert)."
+    )
 
     return parser
 
@@ -184,11 +187,15 @@ def _cmd_report(args: argparse.Namespace) -> int:
     try:
         from tsforecasting.reporting import generate_report
 
-        out = generate_report(args.run_dir, output_dir=args.output_dir)
+        out = generate_report(
+            args.run_dir, output_dir=args.output_dir, html=args.html
+        )
     except (ValueError, ImportError) as exc:
         print(f"report failed: {exc}", file=sys.stderr)
         return 1
     print(f"report generated: {out}")
+    if args.html:
+        print(f"html report: {out.with_suffix('.html')}")
     return 0
 
 

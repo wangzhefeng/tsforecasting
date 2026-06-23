@@ -116,3 +116,23 @@ def test_generate_report_writes_readable_notebook(tmp_path: Path) -> None:
 
     hier_out = generate_report(_hier_run(tmp_path), output_dir=tmp_path / "reports")
     assert hier_out.name == "reconciliation.ipynb"
+
+
+def test_to_html_executes_and_exports(tmp_path: Path) -> None:
+    pytest.importorskip("nbconvert")
+    import nbformat
+
+    from tsforecasting.reporting import to_html
+
+    nb = nbformat.v4.new_notebook()
+    nb["cells"] = [nbformat.v4.new_code_cell("print(2 + 2)")]
+    nb["metadata"]["kernelspec"] = {
+        "display_name": "Python 3",
+        "language": "python",
+        "name": "python3",
+    }
+    p = tmp_path / "t.ipynb"
+    nbformat.write(nb, p)
+    html = to_html(p)
+    assert html.suffix == ".html"
+    assert "4" in html.read_text()  # executed print output

@@ -17,7 +17,7 @@ ml = ["mlforecast", "scikit-learn"]
 neural = ["neuralforecast"]
 hierarchical = ["hierarchicalforecast", "datasetsforecast"]
 plot = ["matplotlib"]
-report = ["nbformat"]
+report = ["nbformat", "nbconvert", "ipykernel"]
 
 [project.scripts]
 tsforecasting = "tsforecasting.cli:main"
