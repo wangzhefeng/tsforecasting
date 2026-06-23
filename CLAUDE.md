@@ -12,6 +12,7 @@ Read these before implementation:
 - `docs/unified-ts-framework-plan-v2.md` — current implementation baseline. Build from this and `docs/PLAN.md`.
 - `docs/unified-ts-framework-plan-v1.md` — v1 historical baseline, **superseded by v2**; kept for design history only. Do not implement from its module specs (§5 architecture / §6 catalog) and do not overwrite it.
 - `docs/LOG.md` — development log.
+- `docs/model_catalog.md` — full Nixtla model catalog (77 entries across stats/neural/ml with source + status), generated from `src/tsforecasting/models/catalog.py`.
 
 ## Toolchain
 

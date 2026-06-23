@@ -9,6 +9,26 @@
 - 具体计划项状态记录在 `docs/PLAN.md` 的“计划项实现记录”。
 - 日志条目应包含日期、类型、摘要、涉及文件、验证命令、结果和下一步。
 
+## 2026-06-23 - full Nixtla model catalog 完成（Phase 2 / P12）
+
+- 类型：impl（phase-2 / catalog）
+- 摘要：落地 full Nixtla model catalog（plan §6/§9「full catalog 与官方模型目录有来源记录和 status」）。新增 `src/tsforecasting/models/catalog.py`（纯数据，无 heavy import，base env 可加载）：`CatalogEntry`(name/backend/class_path/model_type/status/source_url/dependency_group) + `CATALOG` 共 **77 条**（statsforecast 35 + neuralforecast 34 + mlforecast-sklearn 8），`list_catalog(backend/status)` 过滤、`generate_catalog_md` 生成 markdown 表。**独立于 `REGISTRY`**（后者是 `build_model` 的 mvp preset，不动）——cataloged 模型仅"已记录"不等于"可 build"，避免污染 build path。
+- 范围（用户确认全覆盖三 backend）：statsforecast 主要预测模型（naive/ets/exponential/theta/arima/ces/croston/mfles/mstl/tbats/garch 家族，排除 `ConformalIntervals`/`NaNModel`/`SklearnModel` 等 helper）；neuralforecast（NHITS/NBEATS/NBEATSx/RNN/LSTM/GRU/TCN/TFT/DeepAR/Transformer 家族等，排除 `HINT` wrapper 与 `SOFTSSharp`/`XLinear` variant）；mlforecast（6 个已 mvp 的 sklearn 估计器 + `kneighbors`/`svr`，LGBM/XGB 需额外 extra 故暂略）。
+- 状态映射：现有 10 个 mvp preset（`seasonal_naive`/`auto_ets`/6 sklearn/`nhits`/`nbeats`）标 `mvp_smoke`，其余 `cataloged`（plan §6「不得把全量验证作为阻塞项」）。`source_url`：stats/neural 指各 backend 的 models 文档总览页，mlforecast 指对应 sklearn generated 页。`status` 生命周期：cataloged → mvp_smoke → validated/blocked/deprecated。
+- 关键决策（用户两问）：(1) **独立 catalog + 文档**（不扩 REGISTRY 统一，catalog 是文档/追踪层，不该和 build path 耦合）；(2) **三 backend 全覆盖**官方目录。
+- 涉及文件：`src/tsforecasting/models/catalog.py`（新）、`tests/unit/test_catalog.py`（新）、`docs/model_catalog.md`（新，由 `generate_catalog_md` 生成）、`docs/PLAN.md`（P12 row）。
+- 验证命令：
+
+```bash
+uv run pytest -q tests/unit/test_catalog.py   # 6 passed
+uv run python -c "from tsforecasting.models.catalog import CATALOG; import importlib; \
+bad=[e.name for e in CATALOG if not hasattr(__import__('importlib').import_module(e.class_path.rpartition('.')[0]), e.class_path.rpartition('.')[2])]; print(len(CATALOG),'entries,',len(bad),'bad')"  # 77 entries, 0 bad
+uv run ruff check .                            # All checks passed
+```
+
+- 结果：通过（TDD RED→GREEN）。77 条 class_path **全量 import 验证 0 错**（准确性保证）；`generate_catalog_md` 产出 `docs/model_catalog.md`（三 backend 分节表，含来源 + status）。catalog 纯 stdlib，base env 直接可用。
+- 下一步：Phase 2 余项——四项目架构诊断报告（tsproj_*，用户已说推迟）、概率预测/区间指标（会动 artifact 契约）、HTML 导出（`nbconvert`）；以及把更多 `cataloged` 模型逐步推进到 `mvp_smoke`（按需注册进 `REGISTRY`）。
+
 ## 2026-06-23 - P11 阶段验收（MVP-0 / MVP-1 / Phase 2 首次全验收）
 
 - 类型：acceptance（continuous / P11）
