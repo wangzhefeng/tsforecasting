@@ -9,6 +9,25 @@
 - 具体计划项状态记录在 `docs/PLAN.md` 的“计划项实现记录”。
 - 日志条目应包含日期、类型、摘要、涉及文件、验证命令、结果和下一步。
 
+## 2026-06-23 - P10 notebook reporting 完成（Phase 2）
+
+- 类型：impl（phase-2 / P10）
+- 摘要：实现 notebook reporting，满足 plan §9「`reports/{run_id}/model_comparison.ipynb` 可由已存在 artifacts 生成」。新增 `reporting.py`：`detect_run_type` 按有无 `model_comparison.csv`/`reconciliation_diagnostics.csv` 区分 MVP-0 / hierarchical run；`build_mvp0_notebook` / `build_hierarchical_notebook` 用 `nbformat` **静态构造** notebook（不执行，code cell `outputs==[]`、`execution_count=None`）；`generate_report` 检测类型并写 `reports/{run_id}/model_comparison.ipynb`（MVP-0）或 `reconciliation.ipynb`（hierarchical）。MVP-0 notebook = markdown 元信息（run_id/config/freq/models/backtest）+ 5 个 code cell（排名表 / metrics 柱状图 / 最佳模型 backtest 曲线 / runtime 计时柱状图）；hierarchical notebook = 元信息（dataset/freq/levels/base/reconcilers）+ 5 个 code cell（层级表 / diagnostics 排名 / mse 柱状图 / reconciled vs base 曲线）。CLI 新增 `report --run-dir [--output-dir]` 子命令。
+- 关键决策（用户三问三答）：(1) **静态构造**（`nbformat` 不执行，用户 Run All 渲染，CI 友好、不污染依赖隔离）；(2) **两类 run 都支持**（MVP-0 + hierarchical 分支，hierarchical notebook 形态独立）；(3) **新 `[report]` extra = `["nbformat"]`**（语义独立，绘图靠 `plot` extra 的 matplotlib，notebook 顶部注明运行依赖）。
+- 实现细节：code cell 用 `__RUN_DIR__` 占位 + `str.replace` 注入绝对路径，避免 f-string/`.format` 的 `{}` 转义冲突；notebook 加 `kernelspec=python3` metadata；`generate_report` 捕获 `ValueError`（run_dir 不含识别 artifact）/`ImportError`（无 `[report]` extra）。
+- 涉及文件：`pyproject.toml`（`[report]=["nbformat"]`）、`src/tsforecasting/reporting.py`（新）、`src/tsforecasting/cli/__init__.py`（`report` 子命令）、`tests/unit/test_reporting.py`（新）、`.gitignore`（`reports/`）、`docs/PLAN.md`。
+- 验证命令：
+
+```bash
+uv sync --extra report --extra hierarchical --extra plot
+uv run tsforecasting report --run-dir runs/ett_small_stats/tsforecasting-* --output-dir /tmp/reports
+uv run pytest -q          # report+hierarchical+plot env：71 passed, 3 skipped
+uv run ruff check .       # All checks passed
+```
+
+- 结果：通过（TDD：合成 run_dir RED→GREEN）。真实 report：MVP-0 stats run → `model_comparison.ipynb`（6 cells）、hierarchical run → `reconciliation.ipynb`（6 cells），均 `nbformat.read` 读回有效、code cell 全静态（outputs 空）。`reports/` 已 gitignore。base env（无 `[report]` extra）reporting 测试跳过，lazy import 不变量成立。
+- 下一步：P11 阶段验收；Phase 2 余项（full catalog、更多模型、概率预测、四项目架构诊断报告、可选 HTML 导出 via nbconvert）。
+
 ## 2026-06-23 - P9 TourismSmall hierarchical reconciliation 完成（MVP-1 收尾）
 
 - 类型：impl（mvp-1 / P9）

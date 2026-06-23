@@ -53,6 +53,13 @@ def _build_parser() -> argparse.ArgumentParser:
     p_reconcile.add_argument("--config", required=True)
     _add_run_overrides(p_reconcile)
 
+    p_report = sub.add_parser(
+        "report",
+        help="Generate a notebook report from a run dir (P10).",
+    )
+    p_report.add_argument("--run-dir", required=True)
+    p_report.add_argument("--output-dir", default="reports")
+
     return parser
 
 
@@ -173,6 +180,18 @@ def _cmd_reconcile(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_report(args: argparse.Namespace) -> int:
+    from tsforecasting.reporting import generate_report
+
+    try:
+        out = generate_report(args.run_dir, output_dir=args.output_dir)
+    except (ValueError, ImportError) as exc:
+        print(f"report failed: {exc}", file=sys.stderr)
+        return 1
+    print(f"report generated: {out}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -181,6 +200,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "run": _cmd_run,
         "backtest": _cmd_backtest,
         "reconcile": _cmd_reconcile,
+        "report": _cmd_report,
     }
     return dispatch[args.command](args)
 
