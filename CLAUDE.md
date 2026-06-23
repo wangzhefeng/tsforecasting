@@ -31,6 +31,7 @@ Read these before implementation:
 - Each **forecast** backend is an adapter under `src/tsforecasting/models/nixtla/` mirroring `StatsForecastAdapter` (`predict`/`cross_validation` returning the canonical long contracts with the dense-rank `horizon` column + a `timing` dict); `src/tsforecasting/orchestration/run.py` groups models by backend, builds one adapter per backend, and lazy-imports optional backends so the base install stays importable. **Hierarchical reconciliation is a separate flow** (`config/hierarchical.py` + `reconciliation.py` + `orchestration/reconcile.py` + the `reconcile` CLI subcommand) with its own `HierarchicalConfig` and artifact set (`base_predictions` / `reconciled_predictions` / `reconciliation_diagnostics`), not a forecast adapter.
 - Full Nixtla catalog, Jupyter reporting, TimeGPT, legacy adapters, and local foundation models are future phases, not MVP-0 blockers.
 - Reuse Nixtla native APIs for training, prediction, cross-validation, feature handling, evaluation, plotting, and reconciliation when available.
+- Phase-2 opt-ins: `prediction_intervals.levels` appends `lo-/hi-` columns to predictions/backtest and `coverage-/width-` rows to metrics (statsforecast native `level=`; `model_comparison` still ranks on core point metrics); `report --html` executes the notebook and exports HTML (needs the `[report]` extra + a registered `python3` kernel).
 - `tsforecasting` should focus on config parsing, validation, field mapping, output normalization, logging, artifacts, and phase-appropriate reporting.
 
 ## Documentation Rules

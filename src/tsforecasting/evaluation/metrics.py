@@ -57,6 +57,37 @@ def compute_metrics(backtest: pd.DataFrame, run_id: str) -> pd.DataFrame:
                     "value": float(agg.loc[metric, model]),
                 }
             )
+
+    # optional interval metrics (coverage / width) when backtest carries lo/hi.
+    # These are additive to metrics.csv but excluded from model_comparison,
+    # which only pivots the four core metrics.
+    levels = sorted({int(c.split("-", 1)[1]) for c in backtest.columns if c.startswith("lo-")})
+    for level in levels:
+        lo_col, hi_col = f"lo-{level}", f"hi-{level}"
+        if lo_col not in backtest.columns or hi_col not in backtest.columns:
+            continue
+        for model in model_cols:
+            sub = backtest[backtest["model"] == model]
+            coverage = float(((sub[lo_col] <= sub["y"]) & (sub["y"] <= sub[hi_col])).mean())
+            width = float((sub[hi_col] - sub[lo_col]).mean())
+            rows.append(
+                {
+                    "run_id": run_id,
+                    "backend": backend_of[model],
+                    "model": model,
+                    "metric": f"coverage-{level}",
+                    "value": coverage,
+                }
+            )
+            rows.append(
+                {
+                    "run_id": run_id,
+                    "backend": backend_of[model],
+                    "model": model,
+                    "metric": f"width-{level}",
+                    "value": width,
+                }
+            )
     return pd.DataFrame(rows, columns=METRICS_COLUMNS)
 
 

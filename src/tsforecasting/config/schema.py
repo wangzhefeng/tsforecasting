@@ -75,6 +75,15 @@ class MLForecastConfig:
 
 
 @dataclass
+class PredictionIntervalsConfig:
+    """Optional prediction-interval levels (Phase 2). When set, statsforecast
+    forecasts/backtests append ``lo-{level}``/``hi-{level}`` columns and the
+    evaluator computes coverage/width per level."""
+
+    levels: list[int]
+
+
+@dataclass
 class RuntimeConfig:
     collect_timing: bool = True
     log_name: str = "main"
@@ -97,6 +106,7 @@ class Config:
     artifacts: ArtifactsConfig
     predict: PredictConfig | None = None
     mlforecast: MLForecastConfig | None = None
+    prediction_intervals: PredictionIntervalsConfig | None = None
     seed: int = 0
     # resolved at run time:
     run_id: str | None = None
@@ -212,6 +222,21 @@ def _build_mlforecast(raw: dict) -> MLForecastConfig:
     )
 
 
+def _build_prediction_intervals(raw: dict) -> PredictionIntervalsConfig:
+    levels = _require(raw, "levels", "prediction_intervals")
+    if (
+        not isinstance(levels, list)
+        or not levels
+        or not all(
+            isinstance(x, int) and not isinstance(x, bool) and 0 < x < 100 for x in levels
+        )
+    ):
+        raise ConfigError(
+            "prediction_intervals.levels: must be a non-empty list of integers in (0, 100)"
+        )
+    return PredictionIntervalsConfig(levels=list(levels))
+
+
 def _build_config(raw: dict) -> Config:
     data = _build_data(_require(raw, "data", "config"))
     bt_raw = _require(raw, "backtest", "config")
@@ -230,6 +255,9 @@ def _build_config(raw: dict) -> Config:
     mlforecast = None
     if raw.get("mlforecast"):
         mlforecast = _build_mlforecast(raw["mlforecast"])
+    prediction_intervals = None
+    if raw.get("prediction_intervals"):
+        prediction_intervals = _build_prediction_intervals(raw["prediction_intervals"])
     seed = raw.get("seed", 0)
     if not isinstance(seed, int) or isinstance(seed, bool):
         raise ConfigError("seed must be an integer")
@@ -242,6 +270,7 @@ def _build_config(raw: dict) -> Config:
         artifacts=artifacts,
         predict=predict,
         mlforecast=mlforecast,
+        prediction_intervals=prediction_intervals,
         seed=seed,
     )
 

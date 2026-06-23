@@ -136,6 +136,21 @@ def test_neuralforecast_backend_loads_without_top_level_section(tmp_path: Path) 
     assert config.models[-1].params["h"] == 24
 
 
+def test_prediction_intervals_loads(tmp_path: Path) -> None:
+    data = _base()
+    data["prediction_intervals"] = {"levels": [80, 95]}
+    config = load_config(_write(tmp_path, data))
+    assert config.prediction_intervals is not None
+    assert config.prediction_intervals.levels == [80, 95]
+
+
+def test_prediction_intervals_bad_levels_raise(tmp_path: Path) -> None:
+    data = _base()
+    data["prediction_intervals"] = {"levels": [120]}
+    with pytest.raises(ConfigError, match="levels"):
+        load_config(_write(tmp_path, data))
+
+
 def test_unsupported_metric_raises(tmp_path: Path) -> None:
     data = _base()
     data["evaluation"]["metrics"] = ["mae", "mase"]

@@ -9,6 +9,27 @@
 - 具体计划项状态记录在 `docs/PLAN.md` 的“计划项实现记录”。
 - 日志条目应包含日期、类型、摘要、涉及文件、验证命令、结果和下一步。
 
+## 2026-06-24 - HTML 报告导出 + 概率预测/区间指标 完成（Phase 2 / P13-P14）
+
+- 类型：impl（phase-2 / P13 HTML、P14 intervals）
+- P13 摘要：notebook HTML 导出。`reporting.to_html(notebook_path)` 用 `nbconvert` `ExecutePreprocessor` 执行 notebook（运行 code cell，含 matplotlib 画图）+ `HTMLExporter` 转自包含 HTML。`generate_report(..., html=True)` 触发；CLI `report --html` flag。`generate_report` 把 run_dir resolve 为绝对路径（ExecutePreprocessor cwd 是 notebook 目录，相对路径会 FileNotFoundError——spike 实测修复）。kernel 缺失（`NoSuchKernel`）转 friendly `ImportError`，提示 `python -m ipykernel install --sys-prefix --name python3`。`[report]` extra += `nbconvert`/`ipykernel`。
+- P13 spike 结论：`ExecutePreprocessor(kernel_name="python3")` 执行需注册的 python3 kernel（`ipykernel` 提供）；nbconvert 不自动注册，需手动 `ipykernel install --sys-prefix`（venv scope，不污染 user）。HTML 含 `<img>`（matplotlib inline 输出），372KB。
+- P14 摘要：概率预测/区间指标。config 增 `PredictionIntervalsConfig(levels)`（顶层可选，校验 `(0,100)` 整数）；`StatsForecastAdapter` 接 `levels`，`predict`/`cross_validation` 传原生 `level=`，wide 输出按模型 concat 把 `{model}-lo-{l}`/`{model}-hi-{l}` rename 成 `lo-{l}`/`hi-{l}` **追加**到 long（必需列契约不变，`validate_columns` 只查必需列）；无 levels 时走原 melt（零行为变化）。`compute_metrics` 当 backtest 含 `lo-`/`hi-` 列时，per (model, level) 算 `coverage-{l}`（y∈[lo,hi] 比例）+ `width-{l}`（平均 hi-lo）加到 `metrics.csv`；`model_comparison` 只 pivot 4 个 core metrics，区间行天然不进排名。先支持 statsforecast（`SeasonalNaive`/`AutoETS` 原生 interval，spike 确认 `level=[80,95]` 输出 `*-lo-*`/`*-hi-*` 列）。
+- 关键决策（用户）：HTML **执行后导出**（含图表，非静态）；区间 artifact **追加列**（不破坏 MVP-0 契约）；区间 backend **先 stats**（原生 level 成熟，不引入 extra）。
+- 涉及文件：P13：`src/tsforecasting/reporting.py`（`to_html`+`generate_report(html=)`+resolve）、`src/tsforecasting/cli/__init__.py`（`--html`）、`pyproject.toml`（`[report]`+=nbconvert/ipykernel）、`tests/unit/test_reporting.py`。P14：`src/tsforecasting/config/{schema,__init__}.py`（`PredictionIntervalsConfig`）、`src/tsforecasting/models/nixtla/stats.py`（levels）、`src/tsforecasting/orchestration/run.py`（传 levels）、`src/tsforecasting/evaluation/metrics.py`（coverage/width）、`configs/examples/ett_small_intervals.yaml`（新）、`tests/unit/test_evaluation.py`（新）、`tests/unit/test_{config,stats_backend}.py`。
+- 验证命令：
+
+```bash
+uv sync --extra report --extra hierarchical --extra plot
+uv run tsforecasting report --run-dir runs/ett_small_stats/tsforecasting-* --html  # .ipynb + .html(含 <img>)
+uv run tsforecasting run --config configs/examples/ett_small_intervals.yaml
+uv run pytest -q          # 85 passed, 3 skipped（ml/neural 未装）
+uv run ruff check .       # All checks passed
+```
+
+- 结果：通过（TDD）。HTML：MVP-0 run 执行导出 372KB HTML 含 matplotlib 图表。概率：ETTh1 + levels=[80,95]，predictions/backtest 追加 4 列，metrics 含 coverage/width（coverage-80=1.0 该数据区间宽），comparison 仅 core metrics（未被区间污染）。必需列契约不变，不开 `prediction_intervals` 时行为零变化。
+- 下一步：概率预测扩到 neural（quantile loss）/ml（conformal）；区间指标纳入 model_comparison 排名；tsproj_* 架构诊断（推迟）。
+
 ## 2026-06-23 - full Nixtla model catalog 完成（Phase 2 / P12）
 
 - 类型：impl（phase-2 / catalog）

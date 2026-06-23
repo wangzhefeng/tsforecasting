@@ -30,7 +30,10 @@ from tsforecasting.utils.logging import get_logger
 def _build_adapter(backend: str, df, group, freq: str, run_id: str, config: Config):
     """Instantiate the adapter for ``backend`` (lazy-importing optional backends)."""
     if backend == "statsforecast":
-        return StatsForecastAdapter(df, group, freq, run_id)
+        levels = (
+            config.prediction_intervals.levels if config.prediction_intervals else None
+        )
+        return StatsForecastAdapter(df, group, freq, run_id, levels=levels)
     if backend == "mlforecast":
         from tsforecasting.models.nixtla.ml import MLForecastAdapter
 

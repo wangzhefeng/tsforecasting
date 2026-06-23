@@ -1,0 +1,46 @@
+# Phase-2 example: StatsForecast point forecasts WITH prediction intervals
+# (levels 80/95). predictions.csv / backtest_predictions.csv append lo-/hi-
+# columns; metrics.csv adds coverage-/width- per level. model_comparison still
+# ranks by the core point metric (mae).
+data:
+  path: examples/ett_small/ETTh1.csv
+  time_col: date
+  target_col: OT
+  id_col: null
+  freq: 1h
+
+backtest:
+  horizon: 24
+  n_windows: 3
+  step_size: 24
+
+models:
+  - name: seasonal_naive
+    backend: statsforecast
+    params:
+      season_length: 24
+  - name: auto_ets
+    backend: statsforecast
+    params:
+      season_length: 24
+
+prediction_intervals:
+  levels: [80, 95]
+
+evaluation:
+  metrics: [mae, rmse, mape, smape]
+  rank_metric: mae
+
+predict:
+  horizon: 24
+
+runtime:
+  collect_timing: true
+  log_name: ett_small_intervals
+  log_level: INFO
+
+artifacts:
+  output_dir: runs/ett_small_intervals
+  save_plots: false
+
+seed: 0
