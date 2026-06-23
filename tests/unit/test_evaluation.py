@@ -41,3 +41,30 @@ def test_compute_metrics_emits_interval_coverage_and_width() -> None:
     # width = mean(hi - lo) = 1.0
     width_m = m[(m["model"] == "m") & (m["metric"] == "width-80")]["value"].iloc[0]
     assert width_m == 1.0
+
+
+def test_model_comparison_appends_interval_columns() -> None:
+    from tsforecasting.evaluation.metrics import build_model_comparison
+
+    metrics = pd.DataFrame(
+        [
+            {"run_id": "r", "backend": "statsforecast", "model": "m", "metric": "mae", "value": 1.0},
+            {"run_id": "r", "backend": "statsforecast", "model": "m", "metric": "rmse", "value": 1.2},
+            {"run_id": "r", "backend": "statsforecast", "model": "m", "metric": "mape", "value": 0.1},
+            {"run_id": "r", "backend": "statsforecast", "model": "m", "metric": "smape", "value": 0.08},
+            {"run_id": "r", "backend": "statsforecast", "model": "m", "metric": "coverage-80", "value": 0.9},
+            {"run_id": "r", "backend": "statsforecast", "model": "m", "metric": "width-80", "value": 2.0},
+        ]
+    )
+    runtime = pd.DataFrame(
+        [{"run_id": "r", "backend": "statsforecast", "model": "m", "model_type": "naive", "total_seconds": 0.1}]
+    )
+    comp = build_model_comparison(metrics, runtime, rank_metric="mae")
+    # core columns still present and ordered
+    assert list(comp.columns)[:4] == ["run_id", "backend", "model", "model_type"]
+    # interval columns appended for display
+    assert "coverage-80" in comp.columns
+    assert "width-80" in comp.columns
+    assert comp.iloc[0]["coverage-80"] == 0.9
+    # ranking still by the core point metric
+    assert comp.iloc[0]["rank_metric"] == "mae"

@@ -136,6 +136,18 @@ REGISTRY: list[RegistryEntry] = [
         status="mvp_smoke",
         dependency_group="neural",
     ),
+    # NeuralForecast quantile preset (Phase 2): NHITS trained with a multi-quantile
+    # loss (MQLoss) so it emits median point forecasts + lo/hi intervals. The loss
+    # is passed via a serializable {class, kwargs} spec in models[].params.
+    RegistryEntry(
+        backend="neuralforecast",
+        model_name="nhits_quantile",
+        class_path="neuralforecast.models.NHITS",
+        model_type="neural_quantile",
+        mvp_preset=True,
+        status="mvp_smoke",
+        dependency_group="neural",
+    ),
 ]
 
 
@@ -168,11 +180,23 @@ def build_model(model: ModelConfig) -> BuiltModel:
             f"!= registry backend '{entry.backend}'"
         )
     cls = _import_class(entry.class_path)
+    params = dict(model.params)
+    # Resolve a serializable loss spec `{class, kwargs?}` (neural quantile models)
+    # into the actual loss instance, keeping run_config.yaml YAML-safe.
+    if isinstance(params.get("loss"), dict):
+        spec = params.pop("loss")
+        if not isinstance(spec.get("class"), str) or not spec["class"].strip():
+            raise RegistryError(f"model '{model.name}': loss.class must be a string")
+        lcls = _import_class(spec["class"])
+        kwargs = spec.get("kwargs") or {}
+        if not isinstance(kwargs, dict):
+            raise RegistryError(f"model '{model.name}': loss.kwargs must be a mapping")
+        params["loss"] = lcls(**kwargs)
     return BuiltModel(
         name=model.name,
         backend=entry.backend,
         model_type=entry.model_type,
-        instance=cls(**model.params),
+        instance=cls(**params),
     )
 
 

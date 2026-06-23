@@ -91,3 +91,17 @@ def test_target_transforms_resolve_and_preserve_contract() -> None:
     assert list(preds.columns) == PREDICTIONS_COLUMNS
     assert list(bt.columns) == BACKTEST_PREDICTIONS_COLUMNS
     assert set(bt["horizon"]) == set(range(1, 25))
+
+
+def test_predict_with_levels_appends_interval_columns() -> None:
+    # MLForecast conformal intervals apply to predict (future), not cross_validation.
+    adapter = MLForecastAdapter(
+        df=_df(), built_models=_built(), freq="1h", run_id="r1",
+        mlforecast_config=_cfg(), levels=[80, 95],
+    )
+    preds = adapter.predict(h=24)
+    assert list(preds.columns)[: len(PREDICTIONS_COLUMNS)] == list(PREDICTIONS_COLUMNS)
+    assert {"lo-80", "hi-80", "lo-95", "hi-95"} <= set(preds.columns)
+    for level in (80, 95):
+        assert (preds[f"lo-{level}"] <= preds["yhat"]).all()
+        assert (preds["yhat"] <= preds[f"hi-{level}"]).all()

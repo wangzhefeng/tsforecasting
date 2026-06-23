@@ -29,7 +29,13 @@ from tsforecasting.artifacts.schema import (
     PREDICTIONS_COLUMNS,
 )
 from tsforecasting.config import MLForecastConfig
-from tsforecasting.models.nixtla.stats import NON_MODEL_COLS_CV, NON_MODEL_COLS_FORECAST
+from tsforecasting.models.nixtla.stats import (
+    NON_MODEL_COLS_CV,
+    NON_MODEL_COLS_FORECAST,
+    _is_pure_model_col,
+    interval_columns,
+    melt_forecast_long,
+)
 from tsforecasting.models.registry import BuiltModel
 
 
@@ -58,11 +64,13 @@ class MLForecastAdapter:
         run_id: str,
         mlforecast_config: MLForecastConfig,
         n_jobs: int = 1,
+        levels: list[int] | None = None,
     ) -> None:
         self._df = df
         self._built = built_models
         self._freq = freq
         self.run_id = run_id
+        self._levels = list(levels) if levels else None
         target_transforms = (
             _resolve_target_transforms(mlforecast_config.target_transforms)
             if mlforecast_config.target_transforms
@@ -92,25 +100,29 @@ class MLForecastAdapter:
 
     def predict(self, h: int) -> pd.DataFrame:
         t0 = time.perf_counter()
-        self._mlf.fit(self._df)
+        if self._levels:
+            from mlforecast.utils import PredictionIntervals
+
+            self._mlf.fit(
+                self._df, prediction_intervals=PredictionIntervals(h=h)
+            )
+        else:
+            self._mlf.fit(self._df)
         self.timing["fit_seconds"] += time.perf_counter() - t0
 
         t0 = time.perf_counter()
-        fcst = self._mlf.predict(h)
+        if self._levels:
+            fcst = self._mlf.predict(h, level=self._levels)
+        else:
+            fcst = self._mlf.predict(h)
         self.timing["predict_seconds"] += time.perf_counter() - t0
 
-        model_cols = [c for c in fcst.columns if c not in NON_MODEL_COLS_FORECAST]
-        name_map = self._name_map(model_cols)
-        long = fcst.melt(
-            id_vars=list(NON_MODEL_COLS_FORECAST),
-            value_vars=model_cols,
-            var_name="_model_col",
-            value_name="yhat",
-        )
-        long["model"] = long["_model_col"].map(name_map)
+        pure = [c for c in fcst.columns if c not in NON_MODEL_COLS_FORECAST and _is_pure_model_col(c)]
+        name_map = self._name_map(pure)
+        long = melt_forecast_long(fcst, NON_MODEL_COLS_FORECAST, name_map, self._levels)
         long["backend"] = self.backend
         long["run_id"] = self.run_id
-        return long[list(PREDICTIONS_COLUMNS)]
+        return long[list(PREDICTIONS_COLUMNS) + interval_columns(self._levels)]
 
     def cross_validation(
         self, h: int, n_windows: int, step_size: int

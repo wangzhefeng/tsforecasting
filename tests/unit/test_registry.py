@@ -113,3 +113,26 @@ def test_build_models_from_config() -> None:
 def test_backend_mismatch_raises() -> None:
     with pytest.raises(RegistryError, match="backend"):
         build_model(ModelConfig(name="seasonal_naive", backend="xgboost", params={}))
+
+
+def test_build_model_resolves_loss_spec() -> None:
+    pytest.importorskip("neuralforecast")
+    built = build_model(
+        ModelConfig(
+            name="nhits_quantile",
+            backend="neuralforecast",
+            params={
+                "h": 4,
+                "input_size": 8,
+                "max_steps": 1,
+                "loss": {
+                    "class": "neuralforecast.losses.pytorch.MQLoss",
+                    "kwargs": {"quantiles": [0.1, 0.5, 0.9]},
+                },
+            },
+        )
+    )
+    from neuralforecast.losses.pytorch import MQLoss
+
+    assert isinstance(built.instance.loss, MQLoss)
+    assert built.model_type == "neural_quantile"

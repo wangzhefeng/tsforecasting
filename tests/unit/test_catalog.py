@@ -20,6 +20,7 @@ _MVP_PRESETS = {
     "hist_gradient_boosting",
     "nhits",
     "nbeats",
+    "nhits_quantile",
 }
 
 

@@ -9,6 +9,27 @@
 - 具体计划项状态记录在 `docs/PLAN.md` 的“计划项实现记录”。
 - 日志条目应包含日期、类型、摘要、涉及文件、验证命令、结果和下一步。
 
+## 2026-06-24 - intervals 扩展到 neural/ml + comparison 完成（Phase 2 / P15）
+
+- 类型：impl（phase-2 / P15）
+- 摘要：把 P14 的 prediction intervals 从 statsforecast 扩到三个 backend，并把区间指标纳入 model_comparison。从 `stats.py` 提取共享 `melt_forecast_long`/`interval_columns`/`_is_pure_model_col` helper，ml/neural adapter 复用。
+- **neural**：新 preset `nhits_quantile`（`neuralforecast.models.NHITS`，`model_type=neural_quantile`，注册 REGISTRY+catalog）。`build_model` 增 loss spec 解析：`models[].params.loss = {class, kwargs?}` → importlib 实例化（如 `MQLoss(quantiles=[0.1,0.5,0.9])`），保持 `run_config.yaml` YAML-safe。`NeuralForecastAdapter` 归一列名：`NHITS-lo-80.0`→`NHITS-lo-80`（去 `.0`）、`NHITS-median`→`NHITS`（point col，interval 列基于 model alias 而非 median col，spike 发现的坑），`yhat`=median。
+- **ml**：`MLForecastAdapter.fit` 传 `PredictionIntervals(h=h)`（conformal），`predict(h, level=)` 产 `{model}-lo-{l}`/`hi-{l}`（列名同 stats，无 `.0`）。**MLForecast 限制**：conformal interval 仅 `predict` 产，`cross_validation(level=)` 不产（warning rerun fit，实测 cv 输出无 lo/hi）——故 ml 仅 predictions.csv 有区间，backtest 无（coverage/width 对 ml 为 NaN）。
+- **comparison**：`build_model_comparison` 当 metrics 含 `coverage-`/`width-` 行时，pivot 后把这些列追加到 `model_comparison`（展示）；`rank_metric` 仍是点指标（mae 等），排名语义不变。
+- 关键决策（用户）：neural **新 preset `nhits_quantile`**（不改现有 nhits 的 MAE 默认，quantile 版 point=median 与 MAE 点预测口径分离）；comparison **只加列展示**（不引入 coverage 排名，避免改 sort 方向）。
+- 涉及文件：`src/tsforecasting/models/nixtla/{stats,ml,neural}.py`（提取 helper + levels）、`src/tsforecasting/models/registry.py`（`nhits_quantile` + loss spec）、`src/tsforecasting/orchestration/run.py`（levels 传三 backend）、`src/tsforecasting/evaluation/metrics.py`（comparison 区间列）、`src/tsforecasting/models/catalog.py`（+ `nhits_quantile`）、`configs/examples/ett_small_intervals_mixed.yaml`（新）、`tests/unit/test_{neural_backend,ml_backend,stats_backend,registry,catalog,evaluation}.py`、`docs/model_catalog.md`（重新生成）。
+- 验证命令：
+
+```bash
+uv sync --extra neural --extra ml --extra hierarchical --extra plot
+uv run tsforecasting run --config configs/examples/ett_small_intervals_mixed.yaml
+uv run pytest -q          # 90 passed, 1 skipped（reporting/nbconvert 未装）
+uv run ruff check .       # All checks passed
+```
+
+- 结果：通过。mixed run（stats+ml+neural quantile + levels=[80]）：predictions.csv 三 backend 都有 `lo-80`/`hi-80` 非空；metrics 含 `coverage-80`/`width-80`（ml 因 cv 无区间，其 coverage 为 NaN，符合 MLForecast 限制）；model_comparison 追加 `coverage-80`/`width-80` 列展示，排名仍按 mae。catalog 增 `nhits_quantile`（共 78 条）。
+- 下一步：ml cv intervals（受 MLForecast 限制，可能需 StatsForecast-style 重算）；区间 `rank_metric`（按 coverage 排名，需改 sort 方向）；tsproj_* 架构诊断（推迟）。
+
 ## 2026-06-24 - HTML 报告导出 + 概率预测/区间指标 完成（Phase 2 / P13-P14）
 
 - 类型：impl（phase-2 / P13 HTML、P14 intervals）

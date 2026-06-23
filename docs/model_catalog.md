@@ -2,7 +2,7 @@
 
 Full Nixtla model directory tracked by `tsforecasting`, with source URL and validation status. Independent of the build-time `REGISTRY` presets — `cataloged` models are listed but not verified runnable.
 
-**Status counts**: cataloged=67, mvp_smoke=10, validated=0, blocked=0, deprecated=0  (total = 77)
+**Status counts**: cataloged=67, mvp_smoke=11, validated=0, blocked=0, deprecated=0  (total = 78)
 
 ## statsforecast (35)
 
@@ -57,7 +57,7 @@ Full Nixtla model directory tracked by `tsforecasting`, with source URL and vali
 | ridge | `sklearn.linear_model.Ridge` | linear | mvp_smoke | [doc](https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.Ridge.html) |
 | svr | `sklearn.svm.SVR` | svm | cataloged | [doc](https://scikit-learn.org/stable/modules/generated/sklearn.svm.SVR.html) |
 
-## neuralforecast (34)
+## neuralforecast (35)
 
 | name | class_path | model_type | status | source |
 | --- | --- | --- | --- | --- |
@@ -78,6 +78,7 @@ Full Nixtla model directory tracked by `tsforecasting`, with source URL and vali
 | nbeats | `neuralforecast.models.NBEATS` | neural | mvp_smoke | [doc](https://nixtlaverse.nixtla.io/neuralforecast/docs/models.html) |
 | nbeatsx | `neuralforecast.models.NBEATSx` | neural | cataloged | [doc](https://nixtlaverse.nixtla.io/neuralforecast/docs/models.html) |
 | nhits | `neuralforecast.models.NHITS` | neural | mvp_smoke | [doc](https://nixtlaverse.nixtla.io/neuralforecast/docs/models.html) |
+| nhits_quantile | `neuralforecast.models.NHITS` | neural_quantile | mvp_smoke | [doc](https://nixtlaverse.nixtla.io/neuralforecast/docs/models.html) |
 | nlinear | `neuralforecast.models.NLinear` | neural | cataloged | [doc](https://nixtlaverse.nixtla.io/neuralforecast/docs/models.html) |
 | patchtst | `neuralforecast.models.PatchTST` | neural | cataloged | [doc](https://nixtlaverse.nixtla.io/neuralforecast/docs/models.html) |
 | rmok | `neuralforecast.models.RMoK` | neural | cataloged | [doc](https://nixtlaverse.nixtla.io/neuralforecast/docs/models.html) |

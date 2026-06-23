@@ -43,6 +43,7 @@ _MVP_PRESETS = frozenset(
         "hist_gradient_boosting",
         "nhits",
         "nbeats",
+        "nhits_quantile",
     }
 )
 
@@ -92,6 +93,7 @@ _RAW: list[tuple[str, str, str, str]] = [
     ("arch", "statsforecast", "statsforecast.models.ARCH", "garch"),
     # --- neuralforecast ---
     ("nhits", "neuralforecast", "neuralforecast.models.NHITS", "neural"),
+    ("nhits_quantile", "neuralforecast", "neuralforecast.models.NHITS", "neural_quantile"),
     ("nbeats", "neuralforecast", "neuralforecast.models.NBEATS", "neural"),
     ("nbeatsx", "neuralforecast", "neuralforecast.models.NBEATSx", "neural"),
     ("dlinear", "neuralforecast", "neuralforecast.models.DLinear", "neural"),

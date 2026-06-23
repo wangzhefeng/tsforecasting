@@ -66,3 +66,32 @@ def test_cross_validation_produces_backtest_contract_and_horizon() -> None:
 def test_model_types_exposed() -> None:
     adapter = NeuralForecastAdapter(df=_df(), built_models=_built(), freq="1h", run_id="r1")
     assert adapter.model_types == {"nhits": "neural", "nbeats": "neural"}
+
+
+def test_predict_quantile_with_levels_appends_interval_columns() -> None:
+    from tsforecasting.config import ModelConfig
+    from tsforecasting.models import build_model
+
+    params = {
+        "h": 24,
+        "input_size": 24,
+        "max_steps": 3,
+        "enable_progress_bar": False,
+        "loss": {
+            "class": "neuralforecast.losses.pytorch.MQLoss",
+            "kwargs": {"quantiles": [0.1, 0.5, 0.9]},
+        },
+    }
+    built = [
+        build_model(
+            ModelConfig(name="nhits_quantile", backend="neuralforecast", params=params)
+        )
+    ]
+    adapter = NeuralForecastAdapter(
+        df=_df(), built_models=built, freq="1h", run_id="r1", levels=[80]
+    )
+    preds = adapter.predict(h=24)
+    assert list(preds.columns)[: len(PREDICTIONS_COLUMNS)] == list(PREDICTIONS_COLUMNS)
+    assert {"lo-80", "hi-80"} <= set(preds.columns)
+    assert (preds["lo-80"] <= preds["yhat"]).all()
+    assert (preds["yhat"] <= preds["hi-80"]).all()

@@ -146,4 +146,9 @@ def build_model_comparison(
     comp["rank_metric"] = rank_metric
     comp = comp.sort_values(rank_metric, ascending=True, kind="stable").reset_index(drop=True)
     comp["rank"] = np.arange(1, len(comp) + 1)
-    return comp[MODEL_COMPARISON_COLUMNS]
+    # Append any interval metric columns (coverage-/width-) for display; ranking
+    # still uses the core point rank_metric.
+    interval_cols = [
+        c for c in wide.columns if c.startswith("coverage-") or c.startswith("width-")
+    ]
+    return comp[MODEL_COMPARISON_COLUMNS + interval_cols]
