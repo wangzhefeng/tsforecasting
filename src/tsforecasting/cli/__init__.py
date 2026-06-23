@@ -181,9 +181,9 @@ def _cmd_reconcile(args: argparse.Namespace) -> int:
 
 
 def _cmd_report(args: argparse.Namespace) -> int:
-    from tsforecasting.reporting import generate_report
-
     try:
+        from tsforecasting.reporting import generate_report
+
         out = generate_report(args.run_dir, output_dir=args.output_dir)
     except (ValueError, ImportError) as exc:
         print(f"report failed: {exc}", file=sys.stderr)

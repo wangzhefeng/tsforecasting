@@ -116,6 +116,16 @@ def test_cli_dry_run_writes_nothing(tmp_path: Path, capsys: pytest.CaptureFixtur
     assert not (tmp_path / "runs").exists()
 
 
+def test_cli_report_invalid_run_dir_fails_gracefully(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # Works in any env: invalid run_dir -> detect_run_type ValueError; in base env
+    # (no nbformat) the import error is also caught. Either way, graceful exit 1.
+    rc = cli_main(["report", "--run-dir", str(tmp_path / "nonexistent")])
+    assert rc == 1
+    assert "report failed" in capsys.readouterr().err
+
+
 def test_run_pipeline_ml_mixed_smoke(tmp_path: Path) -> None:
     """Mixed statsforecast + mlforecast run ranks both backends together."""
     pytest.importorskip("mlforecast")
