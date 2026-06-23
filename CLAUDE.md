@@ -12,12 +12,12 @@ Read these before implementation:
 - `docs/unified-ts-framework-plan-v2.md` — current implementation baseline. Build from this and `docs/PLAN.md`.
 - `docs/unified-ts-framework-plan-v1.md` — v1 historical baseline, **superseded by v2**; kept for design history only. Do not implement from its module specs (§5 architecture / §6 catalog) and do not overwrite it.
 - `docs/LOG.md` — development log.
-- `docs/model_catalog.md` — full Nixtla model catalog (77 entries across stats/neural/ml with source + status), generated from `src/tsforecasting/models/catalog.py`.
+- `docs/model_catalog.md` — full Nixtla model catalog (78 entries across stats/neural/ml with source + status), generated from `src/tsforecasting/models/catalog.py`.
 
 ## Toolchain
 
 - Python `>=3.12`, managed by `uv`.
-- `uv sync` installs base + the `dev` group (`pytest`, `ruff`); `uv sync --extra <ml|neural|hierarchical|plot>` adds an extras group.
+- `uv sync` installs base + the `dev` group (`pytest`, `ruff`); `uv sync --extra <ml|neural|hierarchical|plot|report>` adds an extras group (`report` = nbformat/nbconvert/ipykernel for notebook + HTML reporting).
 - `uv add <pkg>` / `uv add --dev <pkg>` updates dependencies and `uv.lock`.
 - Dev tooling: `uv run pytest`, `uv run ruff check .`.
 - Dependency pins are load-bearing: Nixtla hard-pins `pandas<3`, and numba (transitive via `statsforecast`) caps `numpy<2.5`. Do not bump these without a spike (see `docs/LOG.md` P1).
