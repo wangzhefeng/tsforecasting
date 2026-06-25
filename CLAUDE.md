@@ -44,4 +44,3 @@ Read these before implementation:
 
 - Logging is vendored at `src/tsforecasting/utils/logging.py`: lazy handlers (first `get_logger()` call), CWD-relative `logs/{LOG_NAME}/service*`, no duplicate handlers.
 - `SERVICE_LOG_LEVEL` controls log level; `LOG_NAME` controls the subdirectory under `logs/`.
-- The legacy `utils/log_util.py` is superseded — do not import the repo-top-level `utils/` from inside the package.

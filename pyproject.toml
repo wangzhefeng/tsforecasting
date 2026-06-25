@@ -35,8 +35,6 @@ packages = ["src/tsforecasting"]
 [tool.ruff]
 target-version = "py312"
 line-length = 88
-# Legacy pre-package logger, superseded by src/tsforecasting/utils/logging.py.
-extend-exclude = ["utils"]
 
 [tool.ruff.lint]
 select = ["F", "I"]
