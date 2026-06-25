@@ -9,6 +9,24 @@
 - 具体计划项状态记录在 `docs/PLAN.md` 的“计划项实现记录”。
 - 日志条目应包含日期、类型、摘要、涉及文件、验证命令、结果和下一步。
 
+## 2026-06-25 - 移除遗留 utils/log_util.py + 立项 P16–P19 backlog
+
+- 类型：chore + docs
+- 摘要：删除已被 `src/tsforecasting/utils/logging.py` 取代的仓库顶层遗留模块 `utils/log_util.py`（代码零运行时引用，ruff 早以 `extend-exclude=["utils"]` 标 superseded），连带清理 `pyproject.toml` 孤儿 ruff 排除项与 `CLAUDE.md`/`AGENTS.md` Logging 段失效规则；并在 `docs/PLAN.md` 将 5 个 Phase 2 尾巴落成 P16–P19（`not_started`）：metrics.json（MVP-0b 收尾）、四项目架构诊断报告、区间 rank_metric + MLForecast CV（上游限制）、模型与图表扩展。
+- 涉及文件：
+  - `utils/log_util.py`（删除）
+  - `pyproject.toml`、`CLAUDE.md`、`AGENTS.md`、`docs/PLAN.md`、`docs/LOG.md`
+- 验证命令：
+
+```bash
+git status --short
+uv run ruff check .
+uv run pytest -q
+```
+
+- 结果：通过。`git status` 显示 5 文件改动（`utils/log_util.py` deleted；pyproject/CLAUDE/AGENTS/PLAN modified）；`ruff` All checks passed；`pytest` 90 passed/1 skipped（与 P15 基线一致）。
+- 下一步：可从 P16（metrics.json，最小闭环）或 P18（区间 rank_metric）启动；utils 清理与 PLAN 立项建议拆两个 commit。
+
 ## 2026-06-24 - intervals 扩展到 neural/ml + comparison 完成（Phase 2 / P15）
 
 - 类型：impl（phase-2 / P15）
