@@ -16,7 +16,7 @@ from tsforecasting.artifacts.writer import (
     write_run_config,
 )
 from tsforecasting.config import Config
-from tsforecasting.data import load_data
+from tsforecasting.data_provider import load_data
 from tsforecasting.evaluation.metrics import (
     build_model_comparison,
     build_runtime_metrics,

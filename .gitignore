@@ -222,7 +222,6 @@ __marimo__/
 
 # tsforecasting runtime artifacts
 logs/
-runs/
-lightning_logs/
-datasetsforecast_cache/
+results/
+dataset/datasetsforecast_cache/
 reports/

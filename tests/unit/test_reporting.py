@@ -24,7 +24,7 @@ from tsforecasting.reporting import (  # noqa: E402
 
 
 def _mvp0_run(tmp_path: Path) -> Path:
-    run_dir = tmp_path / "runs" / "mvp0-run"
+    run_dir = tmp_path / "results" / "mvp0-run"
     run_dir.mkdir(parents=True)
     pd.DataFrame(
         [
@@ -46,7 +46,7 @@ def _mvp0_run(tmp_path: Path) -> Path:
 
 
 def _hier_run(tmp_path: Path) -> Path:
-    run_dir = tmp_path / "runs" / "hier-run"
+    run_dir = tmp_path / "results" / "hier-run"
     run_dir.mkdir(parents=True)
     pd.DataFrame(
         [

@@ -30,7 +30,7 @@ def _config(models: list[ModelConfig]) -> Config:
         models=models,
         evaluation=EvaluationConfig(metrics=["mae"]),
         runtime=RuntimeConfig(),
-        artifacts=ArtifactsConfig(output_dir="runs/x"),
+        artifacts=ArtifactsConfig(output_dir="results/x"),
     )
 
 

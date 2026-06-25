@@ -16,7 +16,7 @@ from typing import Any
 import pandas as pd
 
 from tsforecasting.config.hierarchical import HierarchicalDataConfig
-from tsforecasting.data.loader import DataError
+from tsforecasting.data_provider.loader import DataError
 
 
 @dataclass

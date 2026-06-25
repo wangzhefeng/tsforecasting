@@ -8,9 +8,9 @@ import pandas as pd
 import pytest
 
 from tsforecasting.config import DataConfig
-from tsforecasting.data import DataError, load_data
+from tsforecasting.data_provider import DataError, load_data
 
-ETT = Path("examples/ett_small/ETTh1.csv")
+ETT = Path("dataset/ett_small/ETTh1.csv")
 
 
 def _write_csv(tmp_path: Path, df: pd.DataFrame) -> Path:

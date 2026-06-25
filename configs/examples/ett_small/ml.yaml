@@ -2,7 +2,7 @@
 # hourly ETTh1. freq 1h / lags include 24 to match the hourly daily seasonality.
 # Both backends flow into one ranked model_comparison.csv.
 data:
-  path: examples/ett_small/ETTh1.csv
+  path: dataset/ett_small/ETTh1.csv
   time_col: date
   target_col: OT
   id_col: null            # single series -> unique_id = "series_0"
@@ -48,7 +48,7 @@ runtime:
   log_level: INFO
 
 artifacts:
-  output_dir: runs/ett_small_ml
+  output_dir: results/ett_small_ml
   save_plots: false
 
 seed: 0

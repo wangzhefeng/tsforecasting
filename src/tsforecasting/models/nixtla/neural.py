@@ -42,6 +42,24 @@ from tsforecasting.models.nixtla.stats import (
 from tsforecasting.models.registry import BuiltModel
 
 
+def _make_lightning_logger():
+    """Route Lightning TensorBoard telemetry under ``logs/lightning/``.
+
+    Without this, Lightning's default logger writes to ``./lightning_logs/``
+    (one ``version_N/`` per fit). Routing under ``logs/`` keeps neural telemetry
+    with the rest of the run logs. This NeuralForecast version takes
+    ``trainer_kwargs`` on each *model* (not on ``NeuralForecast`` itself); the
+    adapter merges this logger into every model's ``trainer_kwargs``, which the
+    model then forwards to its Lightning ``Trainer``. The import is lazy so the
+    base package (without the ``neural`` extra) still imports cleanly.
+    """
+    try:
+        from lightning.pytorch.loggers import TensorBoardLogger
+    except ImportError:  # older neuralforecast pins
+        from pytorch_lightning.loggers import TensorBoardLogger
+    return TensorBoardLogger(save_dir="logs", name="lightning")
+
+
 def _normalize_neural_cols(wide: pd.DataFrame) -> pd.DataFrame:
     """Normalize NeuralForecast column names so the shared melt helper matches.
 
@@ -76,6 +94,14 @@ class NeuralForecastAdapter:
         self._freq = freq
         self.run_id = run_id
         self._levels = list(levels) if levels else None
+        # This NeuralForecast version builds its Lightning Trainer from each
+        # model's trainer_kwargs; merge in a logger so TensorBoard telemetry
+        # lands under logs/lightning/ instead of the default ./lightning_logs/.
+        lightning_logger = _make_lightning_logger()
+        for m in built_models:
+            tk = dict(getattr(m.instance, "trainer_kwargs", {}) or {})
+            tk["logger"] = lightning_logger
+            m.instance.trainer_kwargs = tk
         self._nf = NeuralForecast(models=[m.instance for m in built_models], freq=freq)
         self.timing: dict[str, float] = {
             "fit_seconds": 0.0,

@@ -9,6 +9,47 @@
 - 具体计划项状态记录在 `docs/PLAN.md` 的“计划项实现记录”。
 - 日志条目应包含日期、类型、摘要、涉及文件、验证命令、结果和下一步。
 
+## 2026-06-25 - 示例配置按数据集分类（ett_small/ + tourism_small/）
+
+- 类型：chore（配置目录重组）+ docs
+- 摘要：把 `configs/examples/` 下 6 个扁平 YAML 按数据集分两组子目录：`ett_small/`（5 个，基于 ETTh1 小时数据）放 stats/ml/neural/intervals/intervals_mixed；`tourism_small/`（1 个，TourismSmall 季度层级）放 hierarchical。按用户选择**去掉与目录重复的数据集前缀**（目录已表数据集，且内部 `log_name`/`output_dir`/`run_id` 不受文件位置影响，身份信息保留）。`git mv` 6 个已跟踪文件；同步 4 处测试引用、README 快速开始+配置表、CLAUDE/AGENTS L7 散文、v2 目录树。**注**：PLAN.md P1–P15 历史记录与 v1 文档保持原扁平路径（历史快照，不重写）。
+- 涉及文件：
+  - `git mv`：`configs/examples/ett_small_{stats,ml,neural,intervals,intervals_mixed}.yaml` → `configs/examples/ett_small/{stats,ml,neural,intervals,intervals_mixed}.yaml`；`configs/examples/tourism_small_hierarchical.yaml` → `configs/examples/tourism_small/hierarchical.yaml`
+  - `tests/integration/{test_run_smoke,test_reconcile_smoke}.py`、`tests/unit/test_config.py`、`README.md`、`CLAUDE.md`、`AGENTS.md`、`docs/unified-ts-framework-plan-v2.md`、`docs/PLAN.md`、`docs/LOG.md`
+- 验证命令：
+
+```bash
+uv run ruff check .
+uv run pytest tests/unit tests/integration -q
+uv run tsforecasting validate-config --config configs/examples/ett_small/stats.yaml
+git grep -nE "configs/examples/(ett_small_stats|ett_small_ml|ett_small_neural|ett_small_intervals|ett_small_intervals_mixed|tourism_small_hierarchical)\.yaml" -- src tests README.md CLAUDE.md AGENTS.md docs/unified-ts-framework-plan-v2.md  # 0
+```
+
+- 结果：通过。`ruff` All checks passed；`pytest` 90 passed/1 skipped；`validate-config` 新路径通过；grep 旧扁平路径在活跃文件中 0 命中。
+- 下一步：本次为纯配置重组、无功能影响。
+
+## 2026-06-25 - 目录结构统一治理（results / dataset / data_provider + 缓存与 lightning 日志归并）
+
+- 类型：chore（重命名 + 归并，零业务逻辑变更）+ docs
+- 摘要：按用户 5 项需求统一治理仓库目录。① `runs/`→`results/`（运行输出，纯配置驱动，源码无字面量）；② `examples/`→`dataset/`（示例数据；注意 `configs/examples/` 是另一个"examples"配置目录，未动）；③ `datasetsforecast_cache/`→`dataset/datasetsforecast_cache/`（层级数据下载缓存归入 dataset/ 统一管理，改 `config/hierarchical.py` 默认值 + `tourism_small_hierarchical.yaml`）；④ `src/tsforecasting/data/`→`data_provider/`（数据加载模块，5 处 import 同步）；⑤ `lightning_logs/`→`logs/lightning/`（NeuralForecast 的 PyTorch Lightning 遥测归入 logs/ 统一管理）。⑤ 是唯一行为性改动：`neural.py` 新增 `_make_lightning_logger()` 返回 `TensorBoardLogger(save_dir="logs", name="lightning")`，合并进每个模型实例的 `trainer_kwargs`——**此版本 NeuralForecast 的 `__init__` 不接受顶层 `trainer_kwargs`**，logger 必须挂模型实例上（每个模型的 `trainer_kwargs` 才被转发给 Lightning Trainer）。同步 6 个示例 YAML、测试、`.gitignore`、README、v2 目录树/路径。**注**：PLAN.md P1–P15 历史记录条目与 v1 文档保持原路径（历史快照，不重写历史）。
+- 涉及文件：
+  - 目录：`runs`→`results`、`examples`→`dataset`、`datasetsforecast_cache`→`dataset/datasetsforecast_cache`、`lightning_logs`→`logs/lightning`、`src/tsforecasting/data`→`src/tsforecasting/data_provider`（后两者 `git mv` 保留历史，前三者普通 `mv`）
+  - `src/tsforecasting/models/nixtla/neural.py`（logger 注入）、`src/tsforecasting/config/hierarchical.py`（cache_dir 默认值）、`data_provider/{__init__,hierarchical}.py` + `orchestration/{run,reconcile}.py`（import）
+  - 6 个 `configs/examples/*.yaml`（path / output_dir / cache_dir）、`.gitignore`、`tests/unit/*`、`tests/integration/*`、`README.md`、`docs/unified-ts-framework-plan-v2.md`
+- 验证命令：
+
+```bash
+uv run ruff check .
+uv run pytest tests/unit tests/integration -q
+git grep -nE "tsforecasting\.data\b" -- src tests               # 0
+git grep -n "output_dir: runs/" -- configs                       # 0
+git grep -n "examples/ett_small/ETTh1.csv" -- src tests configs  # 0
+uv run tsforecasting run --config configs/examples/ett_small_stats.yaml   # results/
+```
+
+- 结果：通过。`ruff` All checks passed；`pytest tests/unit` 82 passed/1 skipped、`pytest tests/integration` 8 passed；grep 守卫全 0 命中；真实 `run ett_small_stats` 产物落 `results/ett_small_stats/`（7 artifact 齐）；`reconcile` 缓存落 `dataset/datasetsforecast_cache/hierarchical/`（TourismSmall 已下载到新路径）；neural 遥测落 `logs/lightning/`（version 目录 96→101，根目录 `lightning_logs/` 不再生成）。修正一处 ruff I001（`data_provider/__init__.py` 的 import 因模块名变长超 88 列，自动改多行）。
+- 下一步：本次为纯重构、无功能影响。可选：在文档里说明根目录 `dataset/`（数据）与 `configs/examples/`（示例配置）的双命名关系，或评估是否改 `configs/examples/`。
+
 ## 2026-06-25 - 移除遗留 utils/log_util.py + 立项 P16–P19 backlog
 
 - 类型：chore + docs

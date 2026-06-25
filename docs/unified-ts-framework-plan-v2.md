@@ -103,15 +103,18 @@ tsforecasting/
   pyproject.toml
   configs/
     examples/
-      ett_small_stats.yaml
-  examples/
+      ett_small/
+        stats.yaml
+      tourism_small/
+        hierarchical.yaml
+  dataset/
     ett_small/
   src/
     tsforecasting/
       __init__.py
       cli/
       config/
-      data/
+      data_provider/
       evaluation/
       artifacts/
       models/
@@ -201,7 +204,7 @@ horizon + n_windows + step_size
 
 ```yaml
 data:
-  path: examples/ett_small/ETTh1.csv
+  path: dataset/ett_small/ETTh1.csv
   time_col: date
   target_col: OT
   id_col: null
@@ -232,14 +235,14 @@ runtime:
   log_level: INFO
 
 artifacts:
-  output_dir: runs/ett_small_stats
+  output_dir: results/ett_small_stats
   save_plots: false
 ```
 
 示例数据策略：
 
-- MVP-0 smoke 选用 `examples/ett_small/ETTh1.csv`（小时采样），与 `freq: 1h` / `season_length: 24` 语义一致。**不要**用 `ETTm1.csv` 配 `freq: 1h`：ETTm1 是 15 分钟采样，会直接撞上频率校验或得到错误季节性。若改用 ETTm1，必须同步改为 `freq: 15min` / `season_length: 96`，并在 data 层显式 resample（MVP-0 不引入 resample）。
-- `examples/ett_small/ETTh1.csv` 是目标路径，不得假设当前已经存在。
+- MVP-0 smoke 选用 `dataset/ett_small/ETTh1.csv`（小时采样），与 `freq: 1h` / `season_length: 24` 语义一致。**不要**用 `ETTm1.csv` 配 `freq: 1h`：ETTm1 是 15 分钟采样，会直接撞上频率校验或得到错误季节性。若改用 ETTm1，必须同步改为 `freq: 15min` / `season_length: 96`，并在 data 层显式 resample（MVP-0 不引入 resample）。
+- `dataset/ett_small/ETTh1.csv` 是目标路径，不得假设当前已经存在。
 - P1/P2 应明确采用“提交极小 fixture”或“提供下载/cache 命令”中的一种，避免 smoke test 隐式依赖网络。
 
 ## 6. 模型与 registry 策略
@@ -304,7 +307,7 @@ run_id, backend, model, model_type, mae, rmse, mape, smape, total_seconds, rank_
 MVP-0 结果目录（`metrics.json` 推迟到 MVP-0b）：
 
 ```text
-runs/{run_id}/
+results/{run_id}/
   run_config.yaml
   manifest.json
   predictions.csv
@@ -318,7 +321,7 @@ runs/{run_id}/
 MVP-1 层级验证额外目录：
 
 ```text
-runs/{run_id}/
+results/{run_id}/
   base_predictions.csv
   reconciled_predictions.csv
   reconciliation_diagnostics.csv
@@ -372,7 +375,7 @@ evaluation:
   engine: hierarchicalforecast
 
 artifacts:
-  output_dir: runs/tourism_small_hierarchical
+  output_dir: results/tourism_small_hierarchical
 ```
 
 ## 9. 测试与验收

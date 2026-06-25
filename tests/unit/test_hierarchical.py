@@ -104,7 +104,7 @@ def _base_hierarchical() -> dict:
         },
         "evaluation": {"metrics": ["mse"]},
         "runtime": {"log_name": "tourism_small_hierarchical", "log_level": "INFO"},
-        "artifacts": {"output_dir": "runs/tourism_small_hierarchical"},
+        "artifacts": {"output_dir": "results/tourism_small_hierarchical"},
         "seed": 0,
     }
 

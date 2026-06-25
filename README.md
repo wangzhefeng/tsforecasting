@@ -17,32 +17,32 @@
 
 ```bash
 uv sync                                                                   # base + dev
-uv run tsforecasting validate-config --config configs/examples/ett_small_stats.yaml
-uv run tsforecasting run --config configs/examples/ett_small_stats.yaml   # runs/{run_id}/
+uv run tsforecasting validate-config --config configs/examples/ett_small/stats.yaml
+uv run tsforecasting run --config configs/examples/ett_small/stats.yaml   # results/{run_id}/
 uv run pytest && uv run ruff check .
 ```
 
-示例配置（均基于小时级 `examples/ett_small/ETTh1.csv`，`freq: 1h` / `season_length: 24`，TourismSmall 除外）：
+示例配置（均基于小时级 `dataset/ett_small/ETTh1.csv`，`freq: 1h` / `season_length: 24`，TourismSmall 除外）：
 
 | 配置 | 说明 | 需 extra |
 | --- | --- | --- |
-| `ett_small_stats.yaml` | StatsForecast `SeasonalNaive`/`AutoETS` | base |
-| `ett_small_ml.yaml` | 混合 StatsForecast + MLForecast | `ml` |
-| `ett_small_neural.yaml` | 混合 StatsForecast + NeuralForecast NHITS（CPU smoke） | `neural` |
-| `ett_small_intervals_mixed.yaml` | 三 backend + 预测区间（levels 80） | `neural`+`ml` |
-| `tourism_small_hierarchical.yaml` | TourismSmall 层级协调（季度） | `hierarchical` |
+| `ett_small/stats.yaml` | StatsForecast `SeasonalNaive`/`AutoETS` | base |
+| `ett_small/ml.yaml` | 混合 StatsForecast + MLForecast | `ml` |
+| `ett_small/neural.yaml` | 混合 StatsForecast + NeuralForecast NHITS（CPU smoke） | `neural` |
+| `ett_small/intervals_mixed.yaml` | 三 backend + 预测区间（levels 80） | `neural`+`ml` |
+| `tourism_small/hierarchical.yaml` | TourismSmall 层级协调（季度） | `hierarchical` |
 
 运行级 override：`--run-id` / `--output-dir` / `--log-name` / `--log-level` / `--dry-run`。
 
 ## 产物
 
-- `run`/`backtest` → `runs/{run_id}/`：`predictions.csv`、`backtest_predictions.csv`、`metrics.csv`、`runtime_metrics.csv`、`model_comparison.csv`、`manifest.json`、`run_config.yaml`（含 `prediction_intervals` 时追加 `lo-/hi-` 列与 `coverage-/width-` 指标）。
+- `run`/`backtest` → `results/{run_id}/`：`predictions.csv`、`backtest_predictions.csv`、`metrics.csv`、`runtime_metrics.csv`、`model_comparison.csv`、`manifest.json`、`run_config.yaml`（含 `prediction_intervals` 时追加 `lo-/hi-` 列与 `coverage-/width-` 指标）。
 - `reconcile` → `base_predictions.csv`、`reconciled_predictions.csv`、`reconciliation_diagnostics.csv`、`manifest.json`、`run_config.yaml`。
 - `report` → `reports/{run_id}/model_comparison.ipynb`（或 `reconciliation.ipynb`），`--html` 额外导出 `.html`。
 
 ## 文档入口
 
-- [docs/PLAN.md](docs/PLAN.md) — 可执行开发计划与计划项实现记录（**P1–P15 全 done**）。
+- [docs/PLAN.md](docs/PLAN.md) — 可执行开发计划与计划项实现记录（**P1–P15 全 done**；P16–P19 Phase 2 backlog）。
 - [docs/model_catalog.md](docs/model_catalog.md) — full Nixtla model catalog（78 条 stats/neural/ml 模型 + 来源 + 验证状态）。
 - [docs/unified-ts-framework-plan-v2.md](docs/unified-ts-framework-plan-v2.md) — 当前实施基线（契约 / 架构）。
 - [docs/unified-ts-framework-plan-v1.md](docs/unified-ts-framework-plan-v1.md) — v1 历史基线，**已被 v2 取代**，仅作设计史保留，勿据其 §5/§6 实施。

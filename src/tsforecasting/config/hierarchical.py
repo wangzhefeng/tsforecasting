@@ -39,7 +39,7 @@ class HierarchicalDataConfig:
     source: str
     dataset: str
     freq: str
-    cache_dir: str = "datasetsforecast_cache"
+    cache_dir: str = "dataset/datasetsforecast_cache"
 
 
 @dataclass
@@ -89,7 +89,7 @@ def _build_hierarchical_data(raw: dict) -> HierarchicalDataConfig:
         )
     dataset = _require_str(raw, "dataset", "data")
     freq = _require_str(raw, "freq", "data")
-    cache_dir = raw.get("cache_dir", "datasetsforecast_cache")
+    cache_dir = raw.get("cache_dir", "dataset/datasetsforecast_cache")
     if not isinstance(cache_dir, str) or not cache_dir.strip():
         raise ConfigError("data.cache_dir must be a non-empty string")
     return HierarchicalDataConfig(

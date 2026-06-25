@@ -3,7 +3,7 @@
 # Both backends flow into one ranked model_comparison.csv. ``max_steps`` is kept
 # tiny for a fast CPU/MPS smoke; raise it for real training.
 data:
-  path: examples/ett_small/ETTh1.csv
+  path: dataset/ett_small/ETTh1.csv
   time_col: date
   target_col: OT
   id_col: null            # single series -> unique_id = "series_0"
@@ -41,7 +41,7 @@ runtime:
   log_level: INFO
 
 artifacts:
-  output_dir: runs/ett_small_neural
+  output_dir: results/ett_small_neural
   save_plots: false
 
 seed: 0

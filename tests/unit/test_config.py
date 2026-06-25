@@ -16,7 +16,7 @@ from tsforecasting.config import (
     resolve_overrides,
 )
 
-EXAMPLE = Path("configs/examples/ett_small_stats.yaml")
+EXAMPLE = Path("configs/examples/ett_small/stats.yaml")
 
 _RUN_ID_RE = re.compile(r"^tsforecasting-\d{8}\d{6}-[0-9a-f]{8}$")
 
@@ -24,7 +24,7 @@ _RUN_ID_RE = re.compile(r"^tsforecasting-\d{8}\d{6}-[0-9a-f]{8}$")
 def _base() -> dict:
     return {
         "data": {
-            "path": "examples/ett_small/ETTh1.csv",
+            "path": "dataset/ett_small/ETTh1.csv",
             "time_col": "date",
             "target_col": "OT",
             "freq": "1h",
@@ -36,7 +36,7 @@ def _base() -> dict:
         ],
         "evaluation": {"metrics": ["mae", "rmse", "mape", "smape"], "rank_metric": "mae"},
         "runtime": {"collect_timing": True, "log_name": "ett_small_mvp0", "log_level": "INFO"},
-        "artifacts": {"output_dir": "runs/ett_small_stats", "save_plots": False},
+        "artifacts": {"output_dir": "results/ett_small_stats", "save_plots": False},
         "seed": 0,
     }
 
@@ -187,12 +187,12 @@ def test_resolve_overrides_applies_cli_values(tmp_path: Path) -> None:
     resolve_overrides(
         config,
         run_id="custom-run",
-        output_dir="runs/x",
+        output_dir="results/x",
         log_name="ln",
         log_level="debug",
     )
     assert config.run_id == "custom-run"
-    assert config.artifacts.output_dir == "runs/x"
+    assert config.artifacts.output_dir == "results/x"
     assert config.runtime.log_name == "ln"
     assert config.runtime.log_level == "DEBUG"
 

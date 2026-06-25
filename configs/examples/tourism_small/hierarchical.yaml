@@ -7,7 +7,7 @@ data:
   source: datasetsforecast
   dataset: TourismSmall
   freq: QE
-  cache_dir: datasetsforecast_cache   # downloaded once, gitignored
+  cache_dir: dataset/datasetsforecast_cache   # downloaded once, gitignored
 
 base_forecast:
   backend: statsforecast
@@ -46,7 +46,7 @@ runtime:
   log_level: INFO
 
 artifacts:
-  output_dir: runs/tourism_small_hierarchical
+  output_dir: results/tourism_small_hierarchical
   save_plots: false
 
 seed: 0

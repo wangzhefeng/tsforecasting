@@ -17,8 +17,8 @@ from tsforecasting.cli import main as cli_main
 from tsforecasting.config import load_config, resolve_overrides
 from tsforecasting.orchestration import run_pipeline
 
-EXAMPLE = Path("configs/examples/ett_small_stats.yaml")
-ML_EXAMPLE = Path("configs/examples/ett_small_ml.yaml")
+EXAMPLE = Path("configs/examples/ett_small/stats.yaml")
+ML_EXAMPLE = Path("configs/examples/ett_small/ml.yaml")
 
 _MANIFEST_KEYS = [
     "run_id",
@@ -42,11 +42,11 @@ _MANIFEST_KEYS = [
 
 def test_run_pipeline_smoke(tmp_path: Path) -> None:
     config = load_config(EXAMPLE)
-    resolve_overrides(config, run_id="smoke-test", output_dir=str(tmp_path / "runs"))
+    resolve_overrides(config, run_id="smoke-test", output_dir=str(tmp_path / "results"))
 
     run_dir = run_pipeline(config, do_predict=True)
 
-    assert run_dir == tmp_path / "runs" / "smoke-test"
+    assert run_dir == tmp_path / "results" / "smoke-test"
     for name in [
         "predictions.csv",
         "backtest_predictions.csv",
@@ -90,12 +90,12 @@ def test_cli_run_end_to_end(tmp_path: Path, capsys: pytest.CaptureFixture[str]) 
             "--run-id",
             "cli-test",
             "--output-dir",
-            str(tmp_path / "runs"),
+            str(tmp_path / "results"),
         ]
     )
     assert rc == 0
     assert "run complete" in capsys.readouterr().out
-    assert (tmp_path / "runs" / "cli-test").is_dir()
+    assert (tmp_path / "results" / "cli-test").is_dir()
 
 
 def test_cli_dry_run_writes_nothing(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -108,12 +108,12 @@ def test_cli_dry_run_writes_nothing(tmp_path: Path, capsys: pytest.CaptureFixtur
             "--run-id",
             "dry",
             "--output-dir",
-            str(tmp_path / "runs"),
+            str(tmp_path / "results"),
         ]
     )
     assert rc == 0
     assert "dry-run plan" in capsys.readouterr().out
-    assert not (tmp_path / "runs").exists()
+    assert not (tmp_path / "results").exists()
 
 
 def test_cli_report_invalid_run_dir_fails_gracefully(
@@ -130,10 +130,10 @@ def test_run_pipeline_ml_mixed_smoke(tmp_path: Path) -> None:
     """Mixed statsforecast + mlforecast run ranks both backends together."""
     pytest.importorskip("mlforecast")
     config = load_config(ML_EXAMPLE)
-    resolve_overrides(config, run_id="ml-smoke-test", output_dir=str(tmp_path / "runs"))
+    resolve_overrides(config, run_id="ml-smoke-test", output_dir=str(tmp_path / "results"))
 
     run_dir = run_pipeline(config, do_predict=True)
-    assert run_dir == tmp_path / "runs" / "ml-smoke-test"
+    assert run_dir == tmp_path / "results" / "ml-smoke-test"
 
     comp = pd.read_csv(run_dir / "model_comparison.csv")
     assert set(comp["backend"]) == {"statsforecast", "mlforecast"}

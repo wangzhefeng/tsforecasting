@@ -6,7 +6,7 @@
 # stats+neural (mlforecast conformal does not produce cv intervals).
 # model_comparison adds coverage-80/width-80 columns (display only).
 data:
-  path: examples/ett_small/ETTh1.csv
+  path: dataset/ett_small/ETTh1.csv
   time_col: date
   target_col: OT
   id_col: null
@@ -57,7 +57,7 @@ runtime:
   log_level: INFO
 
 artifacts:
-  output_dir: runs/intervals_mixed
+  output_dir: results/intervals_mixed
   save_plots: false
 
 seed: 0

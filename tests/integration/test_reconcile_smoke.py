@@ -1,7 +1,7 @@
 """End-to-end smoke test: the P9 TourismSmall hierarchical reconciliation path.
 
 Artifacts are redirected to an absolute tmp ``--output-dir``. The example
-config's ``data.cache_dir`` (``datasetsforecast_cache``) downloads TourismSmall
+config's ``data.cache_dir`` (``dataset/datasetsforecast_cache``) downloads TourismSmall
 once under the repo root (gitignored). Skipped when the ``hierarchical`` extra
 is not installed.
 """
@@ -25,17 +25,17 @@ from tsforecasting.config.hierarchical import (  # noqa: E402
 )
 from tsforecasting.orchestration import run_reconciliation  # noqa: E402
 
-EXAMPLE = Path("configs/examples/tourism_small_hierarchical.yaml")
+EXAMPLE = Path("configs/examples/tourism_small/hierarchical.yaml")
 
 
 def test_reconcile_smoke(tmp_path: Path) -> None:
     config = load_hierarchical_config(EXAMPLE)
     resolve_hierarchical_overrides(
-        config, run_id="reconcile-smoke", output_dir=str(tmp_path / "runs")
+        config, run_id="reconcile-smoke", output_dir=str(tmp_path / "results")
     )
 
     run_dir = run_reconciliation(config)
-    assert run_dir == tmp_path / "runs" / "reconcile-smoke"
+    assert run_dir == tmp_path / "results" / "reconcile-smoke"
 
     for name in [
         "base_predictions.csv",
@@ -74,12 +74,12 @@ def test_cli_reconcile_end_to_end(
             "--run-id",
             "cli-recon",
             "--output-dir",
-            str(tmp_path / "runs"),
+            str(tmp_path / "results"),
         ]
     )
     assert rc == 0
     assert "reconciliation complete" in capsys.readouterr().out
-    assert (tmp_path / "runs" / "cli-recon").is_dir()
+    assert (tmp_path / "results" / "cli-recon").is_dir()
 
 
 def test_cli_reconcile_dry_run(
@@ -94,11 +94,11 @@ def test_cli_reconcile_dry_run(
             "--run-id",
             "dry-recon",
             "--output-dir",
-            str(tmp_path / "runs"),
+            str(tmp_path / "results"),
         ]
     )
     assert rc == 0
     out = capsys.readouterr().out
     assert "dry-run plan" in out
     assert "reconcilers" in out
-    assert not (tmp_path / "runs").exists()
+    assert not (tmp_path / "results").exists()

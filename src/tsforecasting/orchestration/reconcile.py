@@ -19,7 +19,7 @@ from tsforecasting.artifacts.writer import (
     write_manifest,
 )
 from tsforecasting.config.hierarchical import HierarchicalConfig
-from tsforecasting.data import load_hierarchical
+from tsforecasting.data_provider import load_hierarchical
 from tsforecasting.models import build_model
 from tsforecasting.reconciliation import reconcile_pipeline
 from tsforecasting.utils.logging import get_logger
