@@ -32,6 +32,7 @@ Read these before implementation:
 - Full Nixtla catalog, Jupyter reporting, TimeGPT, legacy adapters, and local foundation models are future phases, not MVP-0 blockers.
 - Reuse Nixtla native APIs for training, prediction, cross-validation, feature handling, evaluation, plotting, and reconciliation when available.
 - Phase-2 opt-ins: `prediction_intervals.levels` appends `lo-/hi-` columns to predictions/backtest and `coverage-/width-` rows to metrics (statsforecast native `level=`, neuralforecast quantile loss via the `nhits_quantile` preset, mlforecast conformal — predict-only since MLForecast emits no cv intervals); `model_comparison` appends the interval columns but still ranks on the core point metric; `report --html` executes the notebook and exports HTML (needs the `[report]` extra + a registered `python3` kernel).
+- Config validation must stay metadata-only and dependency-light: `validate-config` rejects unknown registry model names and backend mismatches without importing optional backend packages; CLI run-level overrides are revalidated before dry-run or execution.
 - `tsforecasting` should focus on config parsing, validation, field mapping, output normalization, logging, artifacts, and phase-appropriate reporting.
 
 ## Documentation Rules

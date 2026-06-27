@@ -177,3 +177,39 @@ def test_hierarchical_config_nonpos_horizon_raises(tmp_path: Path) -> None:
     data["base_forecast"]["horizon"] = 0
     with pytest.raises(ConfigError, match="horizon"):
         load_hierarchical_config(_write_cfg(tmp_path, data))
+
+
+def test_resolve_hierarchical_overrides_bad_log_level_raises(tmp_path: Path) -> None:
+    from tsforecasting.config.hierarchical import (
+        ConfigError,
+        load_hierarchical_config,
+        resolve_hierarchical_overrides,
+    )
+
+    config = load_hierarchical_config(_write_cfg(tmp_path, _base_hierarchical()))
+    with pytest.raises(ConfigError, match="log_level"):
+        resolve_hierarchical_overrides(config, log_level="NOTALEVEL")
+
+
+def test_cli_reconcile_dry_run_bad_log_level_returns_nonzero(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from tsforecasting.cli import main as cli_main
+
+    path = _write_cfg(tmp_path, _base_hierarchical())
+    assert (
+        cli_main(
+            [
+                "reconcile",
+                "--config",
+                str(path),
+                "--dry-run",
+                "--log-level",
+                "NOTALEVEL",
+            ]
+        )
+        == 1
+    )
+    err = capsys.readouterr().err
+    assert "config invalid" in err
+    assert "log_level" in err

@@ -68,7 +68,7 @@ def build_manifest(
     backends = sorted({b.backend for b in built_models})
     return {
         "run_id": config.run_id,
-        "run_id_rule": "tsforecasting-<UTC YYYYmmddHHMMSS>-<sha8>",
+        "run_id_rule": "tsforecasting-<UTC YYYYmmddHHMMSS>-<random8>",
         "config_source": config.config_source,
         "run_command": " ".join(sys.argv),
         "seed": config.seed,
@@ -169,7 +169,7 @@ def build_hierarchical_manifest(
     }
     return {
         "run_id": config.run_id,
-        "run_id_rule": "tsforecasting-<UTC YYYYmmddHHMMSS>-<sha8>",
+        "run_id_rule": "tsforecasting-<UTC YYYYmmddHHMMSS>-<random8>",
         "config_source": config.config_source,
         "run_command": " ".join(sys.argv),
         "seed": config.seed,

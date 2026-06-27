@@ -239,4 +239,4 @@ def resolve_hierarchical_overrides(
         config.runtime.log_name = log_name
     if log_level is not None:
         config.runtime.log_level = log_level.upper()
-    return config
+    return validate_hierarchical(config)

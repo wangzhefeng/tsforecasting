@@ -9,6 +9,50 @@
 - 具体计划项状态记录在 `docs/PLAN.md` 的“计划项实现记录”。
 - 日志条目应包含日期、类型、摘要、涉及文件、验证命令、结果和下一步。
 
+## 2026-06-27 - neat-freak 知识同步收尾
+
+- 类型：docs（知识整理）+ memory
+- 摘要：按 `neat-freak` 对本阶段修复后的知识入口做收尾审查。尺寸体检确认 `AGENTS.md` / `CLAUDE.md` 未膨胀；根规则文件新增一条长期规则，要求 config validation 保持 metadata-only、dependency-light，并在 CLI override 后复校验；`docs/unified-ts-framework-plan-v2.md` 修正仍残留的早期预实现口径、旧 `<短hash>` run_id 描述、过时 MVP-0 CLI 限定、旧依赖分组与 logging vendor 表述，新增 2026-06-27 方案调整记录；写入 Codex ad-hoc memory note，要求后续记忆把 `tsforecasting` 从 pre-implementation 状态更新为已实现可运行框架。
+- 涉及文件：
+  - `AGENTS.md`、`CLAUDE.md`
+  - `docs/unified-ts-framework-plan-v2.md`、`docs/LOG.md`
+  - 记忆 note：`/Users/wangzf/.codex/memories/extensions/ad_hoc/notes/2026-06-27-tsforecasting-implemented-config-reliability.md`
+- 验证命令：
+
+```bash
+wc -l AGENTS.md CLAUDE.md README.md docs/PLAN.md docs/LOG.md docs/model_catalog.md docs/unified-ts-framework-plan-v1.md docs/unified-ts-framework-plan-v2.md
+rg -n "预实现|尚未|短hash|不暴露|MVP-0 CLI 只|utils/log_util.py|avg_proportions|dependency_group.*torch" docs/unified-ts-framework-plan-v2.md README.md AGENTS.md CLAUDE.md docs/PLAN.md
+rg -n "今天|昨天|刚刚|最近|上周|today|yesterday|recently" AGENTS.md CLAUDE.md README.md docs/PLAN.md docs/unified-ts-framework-plan-v2.md
+UV_CACHE_DIR=.uv_cache uv run ruff check .
+UV_CACHE_DIR=.uv_cache uv run pytest -q tests/unit/test_config.py tests/unit/test_hierarchical.py
+```
+
+- 结果：通过。尺寸未超限；相对时间 grep 0 命中；stale grep 仅剩历史记录语境；`ruff` clean；目标单元测试通过。主记忆索引未直接编辑，只新增 ad-hoc note 等待记忆系统归并。
+- 下一步：若后续继续推进 P16/P18/P19，仍按“代码事实 → README/docs → AGENTS/CLAUDE → memory note”顺序收尾。
+
+## 2026-06-27 - 配置可靠性、run_id 唯一性与文档契约一致性修复
+
+- 类型：fix（配置校验 + CLI 错误处理 + 文档一致性）
+- 摘要：修复项目复查发现的 5 类问题。`validate-config` 现在会用 `REGISTRY` 元数据校验 `models[].name` 与 backend 匹配，未知模型和 backend mismatch 在配置校验阶段提前失败，且不 import 可选 backend、不实例化模型；`run`/`backtest` 与 `reconcile` 的 CLI override 后都会重新执行配置校验，非法 `--log-level` 在 dry-run 阶段返回 `config invalid` 而不是进入运行期 traceback；默认 `run_id` 保持 `tsforecasting-YYYYmmddHHMMSS-xxxxxxxx` 形态，但后缀改为随机 8 位，避免同秒碰撞；manifest 的 `run_id_rule` 同步为 `<random8>`；README/v2 明确当前 `metrics.csv` 始终输出四个 core metrics，`evaluation.metrics` 不是输出筛选器；v2 MVP-0 验收移除当前 `metrics.json` 必产要求（仍保留 P16）。
+- 涉及文件：
+  - `src/tsforecasting/config/schema.py`、`src/tsforecasting/config/hierarchical.py`、`src/tsforecasting/cli/__init__.py`、`src/tsforecasting/models/registry.py`、`src/tsforecasting/artifacts/writer.py`
+  - `tests/unit/test_config.py`、`tests/unit/test_hierarchical.py`
+  - `README.md`、`docs/unified-ts-framework-plan-v2.md`、`docs/PLAN.md`、`docs/LOG.md`
+- 验证命令：
+
+```bash
+UV_CACHE_DIR=.uv_cache uv run pytest -q tests/unit/test_config.py
+UV_CACHE_DIR=.uv_cache uv run pytest -q tests/unit/test_hierarchical.py
+UV_CACHE_DIR=.uv_cache uv run pytest -q tests/integration/test_run_smoke.py tests/integration/test_reconcile_smoke.py
+UV_CACHE_DIR=.uv_cache uv run ruff check .
+UV_CACHE_DIR=.uv_cache uv run pytest -q
+UV_CACHE_DIR=.uv_cache uv run tsforecasting validate-config --config configs/examples/ett_small/stats.yaml
+UV_CACHE_DIR=.uv_cache uv run tsforecasting reconcile --config configs/examples/tourism_small/hierarchical.yaml --dry-run
+```
+
+- 结果：通过。目标测试分别为 `27 passed`、`14 passed`、`8 passed`；`ruff` All checks passed；全量 `pytest` 为 98 passed / 1 skipped / 20 warnings（warnings 来自 NeuralForecast/PyTorch Lightning 小样本训练设置）；正向 CLI 校验通过。负向手工检查：未知模型返回 `config invalid: model 'does_not_exist' not in registry`；forecast 与 hierarchical 的非法 `--log-level NOTALEVEL` 均返回 `config invalid` 且无 traceback；同秒连续生成 10 个 `run_id` 无重复。
+- 下一步：P16 `metrics.json` 是否实现仍按 backlog 决策；P18 MLForecast CV 区间仍受上游限制。
+
 ## 2026-06-25 - 示例配置按数据集分类（ett_small/ + tourism_small/）
 
 - 类型：chore（配置目录重组）+ docs

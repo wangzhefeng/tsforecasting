@@ -88,16 +88,16 @@ def _load_and_resolve(args: argparse.Namespace) -> object | None:
 
     try:
         config = load_config(args.config)
+        resolve_overrides(
+            config,
+            run_id=args.run_id,
+            output_dir=args.output_dir,
+            log_name=args.log_name,
+            log_level=args.log_level,
+        )
     except ConfigError as exc:
         print(f"config invalid: {exc}", file=sys.stderr)
         return None
-    resolve_overrides(
-        config,
-        run_id=args.run_id,
-        output_dir=args.output_dir,
-        log_name=args.log_name,
-        log_level=args.log_level,
-    )
     return config
 
 
@@ -147,16 +147,16 @@ def _load_and_resolve_hierarchical(args: argparse.Namespace) -> object | None:
 
     try:
         config = load_hierarchical_config(args.config)
+        resolve_hierarchical_overrides(
+            config,
+            run_id=args.run_id,
+            output_dir=args.output_dir,
+            log_name=args.log_name,
+            log_level=args.log_level,
+        )
     except ConfigError as exc:
         print(f"config invalid: {exc}", file=sys.stderr)
         return None
-    resolve_hierarchical_overrides(
-        config,
-        run_id=args.run_id,
-        output_dir=args.output_dir,
-        log_name=args.log_name,
-        log_level=args.log_level,
-    )
     return config
 
 

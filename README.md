@@ -37,6 +37,7 @@ uv run pytest && uv run ruff check .
 ## 产物
 
 - `run`/`backtest` → `results/{run_id}/`：`predictions.csv`、`backtest_predictions.csv`、`metrics.csv`、`runtime_metrics.csv`、`model_comparison.csv`、`manifest.json`、`run_config.yaml`（含 `prediction_intervals` 时追加 `lo-/hi-` 列与 `coverage-/width-` 指标）。
+- `metrics.csv` 当前始终产出四个 core metrics：`mae`、`rmse`、`mape`、`smape`；`evaluation.metrics` 用于限定配置中的核心指标集合与 `rank_metric` 合法性，不作为输出筛选器。
 - `reconcile` → `base_predictions.csv`、`reconciled_predictions.csv`、`reconciliation_diagnostics.csv`、`manifest.json`、`run_config.yaml`。
 - `report` → `reports/{run_id}/model_comparison.ipynb`（或 `reconciliation.ipynb`），`--html` 额外导出 `.html`。
 

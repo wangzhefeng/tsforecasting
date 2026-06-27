@@ -22,8 +22,9 @@ def compute_metrics(backtest: pd.DataFrame, run_id: str) -> pd.DataFrame:
     """Compute the 4 core UtilsForecast metrics per model (long form).
 
     The contract fixes the core metrics as ``mae / rmse / mape / smape`` (v2
-    "at least these four"); ``config.evaluation.metrics`` selects the ranking
-    metric but all four are always produced.
+    "at least these four"); all four are always produced. ``evaluation.metrics``
+    constrains the allowed configured core metric set and ``rank_metric``
+    validity, but it does not filter this output.
     """
     wide = backtest.pivot(
         index=["unique_id", "cutoff", "ds", "y"], columns="model", values="yhat"

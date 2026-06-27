@@ -10,7 +10,7 @@
 
 ## 1. 背景与目标
 
-`tsforecasting` 是一个预实现阶段的统一时间序列预测框架项目。当前仓库已经具备项目元数据、文档、`utils/log_util.py`，尚未创建 `src/`、`configs/`、`examples/`、`tests/`、CLI 入口、测试运行器或 linter。
+`tsforecasting` 已经从预实现阶段进入可运行框架阶段：MVP-0 StatsForecast 纵切面、MVP-1 MLForecast / NeuralForecast / HierarchicalForecast 后端，以及 Phase 2 的 notebook reporting、full model catalog、prediction intervals 均已落地。当前实施状态以 `docs/PLAN.md` 的计划项记录和 `docs/LOG.md` 的验证日志为准。
 
 新框架的长期目标仍然是统一时间序列预测流程：
 
@@ -50,7 +50,7 @@ MVP-0 必须包含：
 - StatsForecast adapter，优先调用原生 `forecast` / `cross_validation`。
 - UtilsForecast 统一产出至少 `mae / rmse / mape / smape`。
 - 基础 artifacts：`run_config.yaml`、`manifest.json`、`predictions.csv`、`backtest_predictions.csv`、`metrics.csv`、`runtime_metrics.csv`、`model_comparison.csv`。`metrics.json`（与 `metrics.csv` 同语义的冗余 json 视图）推迟到 MVP-0b，csv 已满足可复查。
-- `manifest.json` 记录配置来源、运行命令、输入数据、字段映射、后端、模型参数、split/backtest 设置、artifact 路径、日志路径、关键环境变量摘要，以及 `seed`（全局随机种子 + 各后端映射）和 `run_id` 生成规则。`run_id` 默认按 `tsforecasting-<UTC时间戳>-<短hash>` 生成（确定性、可排序），`--run-id` 仅作 override。
+- `manifest.json` 记录配置来源、运行命令、输入数据、字段映射、后端、模型参数、split/backtest 设置、artifact 路径、日志路径、关键环境变量摘要，以及 `seed`（全局随机种子 + 各后端映射）和 `run_id` 生成规则。`run_id` 默认按 `tsforecasting-<UTC时间戳>-<random8>` 生成（时间前缀可排序、随机后缀避免同秒碰撞），`--run-id` 仅作 override。
 
 MVP-0 不做：
 
@@ -130,23 +130,25 @@ tsforecasting/
   docs/
 ```
 
-依赖分组（阶段边界必须在依赖层硬隔离，MVP-0 只解析 base + dev）：
+依赖分组（阶段边界必须在依赖层硬隔离，默认安装只解析 base + dev）：
 
 ```text
-base           = [statsforecast, utilsforecast]             # MVP-0 纵切面只需要这组
-[ml]           = [mlforecast]                                # MVP-1
-[neural]       = [neuralforecast]                            # MVP-1，带 PyTorch，体积大
-[hierarchical] = [hierarchicalforecast, datasetsforecast]    # MVP-1 TourismSmall
+base           = [statsforecast, utilsforecast, pyyaml, numpy, pandas]
+[ml]           = [mlforecast, scikit-learn]
+[neural]       = [neuralforecast]                            # 带 PyTorch，体积大
+[hierarchical] = [hierarchicalforecast, datasetsforecast]    # TourismSmall
+[plot]         = [matplotlib]
+[report]       = [nbformat, nbconvert, ipykernel]
 dev            = [pytest, ruff]                              # 测试与 lint
 ```
 
-- 对应 catalog 字段 `dependency_group`（core / ml / torch / hierarchical / api）：base→core、ml→ml、neural→torch、hierarchical→hierarchical。
+- 对应 catalog 字段 `dependency_group`（core / ml / neural / hierarchical / report / plot / api）：base→core、ml→ml、neural→neural、hierarchical→hierarchical。
 - `[neural]` 的 PyTorch 体积大，CI 对 `[neural]` smoke 单独跑一个受限 job，不进入默认 `uv sync`。
 
-日志边界（P1 写死为 vendor，不再悬而未决）：
+日志边界：
 
-- P1 将 `utils/log_util.py` 的行为契约 vendor 进 `src/tsforecasting/utils/logging.py`；包内任何模块都不得 import 仓库顶层 `utils/`，否则安装包会依赖仓库根目录、不可独立安装。
-- 现状 `utils/log_util.py` 在 import 时即 `mkdir` 并注册两个 handler（有 import 副作用）。迁移时必须改为 lazy：首次 `get_logger()` 才建 handler，避免测试 import 建目录、避免多模块 import 叠加 handler。
+- `src/tsforecasting/utils/logging.py` 是正式日志工具；包内任何模块都不得 import 仓库顶层 `utils/`，否则安装包会依赖仓库根目录、不可独立安装。
+- 日志 handler 必须保持 lazy：首次 `get_logger()` 才建 handler，避免测试 import 建目录、避免多模块 import 叠加 handler。
 - `SERVICE_LOG_LEVEL` 继续控制日志级别，`LOG_NAME` 继续控制日志目录语义。
 
 ## 5. 数据、配置与回测契约
@@ -185,12 +187,15 @@ MVP-0 只支持单一 YAML 文件和少量运行级 CLI override：
 --dry-run
 ```
 
-MVP-0 CLI 只暴露两个子命令：
+当前 CLI 暴露以下子命令：
 
-- `validate-config --config <path>`：纯 schema 校验，不读数据、不训练。
-- `run --config <path>`：默认执行回测 + 评估（产 `backtest_predictions.csv`、`metrics.csv`、`runtime_metrics.csv`、`model_comparison.csv`、`manifest.json`）；若配置带 `predict.horizon`，额外产 `predictions.csv`（未来预测、无真值）。
+- `validate-config --config <path>`：配置校验，不读数据、不训练；校验 registry 模型名与 backend 匹配，但不 import optional backend。
+- `run --config <path>`：执行回测 + 评估；若配置带 `predict.horizon`，额外产 `predictions.csv`。
+- `backtest --config <path>`：执行回测 + 评估，不产未来预测。
+- `reconcile --config <path>`：TourismSmall 层级协调独立流程。
+- `report --run-dir <path> [--html]`：从已有 artifact 生成 notebook，可选执行并导出 HTML。
 
-`backtest`、`predict`、`hierarchical`、`report` 等子命令在 MVP-0 不暴露，分别推到 MVP-0b / MVP-1 / Phase-2。
+所有 forecast/hierarchical 运行级 override（`--run-id` / `--output-dir` / `--log-name` / `--log-level`）在应用后必须重新校验；非法 override 应在 dry-run 或执行前以 `config invalid` 失败。
 
 MVP-0 backtest 只支持一种主语义：
 
@@ -302,6 +307,8 @@ run_id, backend, model, model_type, n_series, n_rows, fit_seconds, predict_secon
 run_id, backend, model, model_type, mae, rmse, mape, smape, total_seconds, rank_metric, rank
 ```
 
+当前实现始终产出 `mae` / `rmse` / `mape` / `smape` 四个 core metrics。`evaluation.metrics` 用于限定配置中的核心指标集合与 `rank_metric` 合法性，不作为 metrics 输出筛选器。
+
 排名规则默认 `rank_metric = mae`、值升序（值越小 rank 越靠前）；可通过 `evaluation.rank_metric` override 为 `rmse` / `smape` 等已产出指标。
 
 MVP-0 结果目录（`metrics.json` 推迟到 MVP-0b）：
@@ -387,7 +394,7 @@ MVP-0 验收：
 - `uv run pytest` 可以运行最小测试套件。
 - `validate-config` 能校验 ETT MVP-0 配置。
 - canonical frame 转换测试覆盖无 `id_col`、重复时间戳、频率缺失或不可推断。
-- StatsForecast smoke 可以生成 `predictions.csv`、`backtest_predictions.csv`、`metrics.csv`、`metrics.json`、`runtime_metrics.csv`、`model_comparison.csv`、`manifest.json`。
+- StatsForecast smoke 可以生成 `predictions.csv`、`backtest_predictions.csv`、`metrics.csv`、`runtime_metrics.csv`、`model_comparison.csv`、`manifest.json`；`metrics.json` 已推迟到 P16 / MVP-0b。
 - `manifest.json` 包含配置、命令、日志、输入、字段映射、模型参数和 artifact 路径。
 
 MVP-1 验收：
@@ -428,6 +435,7 @@ Phase 2 验收：
 | 2026-06-23 | 评审修订：补 MVP-0 CLI 语义、输出契约派生规则、可复现性字段 | `run`/`backtest`/`predict` 语义未定义；`horizon`/`rank_metric`/`seed`/`run_id` 缺规则 | §5.2 钉死 MVP-0 CLI=`validate-config`+`run`；§7 标注 `horizon` 派生、`rank_metric` 默认 mae；manifest 增 `seed`/`run_id`；`metrics.json` 推迟 MVP-0b |
 | 2026-06-23 | 评审修订：TourismSmall MiddleOut 参数取值修正 + pandas 3.x 兼容风险 | `top_down_method: proportion_averages` 非合法值；pandas 3.x 与 Nixtla 兼容性未验证 | §8 改为 `avg_proportions` 并要求对齐 `methods.py`；§10 + P1 dependency spike 兜底 pin `pandas<3` |
 | 2026-06-23 | P9 实测修正 `top_down_method` 合法值 | `avg_proportions` 在 hierarchicalforecast 1.5.1 实测非法；合法值为 `average_proportions`/`forecast_proportions`/`proportion_averages`（P0.3 误把合法的 `proportion_averages` 当非法、改成非法的 `avg_proportions`） | §8 `top_down_method` 改回 `average_proportions`，合法值清单更新为三选 |
+| 2026-06-27 | 知识同步：当前状态、CLI 语义和 run_id 规则对齐实现 | v2 仍含早期预实现口径、MVP-0 CLI 限定和 `<短hash>` run_id 描述，已与 P22 实现不一致 | §1 改为已实现框架阶段；§3.1 run_id 改为 `<random8>`；§4 依赖分组补齐当前 extras；§5.2 改为当前 CLI 子命令与 override 复校验规则 |
 
 ## 12. 参考资料
 

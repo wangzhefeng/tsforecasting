@@ -8,7 +8,7 @@ surface at the Nixtla pair + pyyaml.
 
 from __future__ import annotations
 
-import hashlib
+import secrets
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -277,6 +277,8 @@ def _build_config(raw: dict) -> Config:
 
 def validate(config: Config) -> Config:
     """Run cross-field validation. Type/required-key checks happen at build time."""
+    from tsforecasting.models.registry import RegistryError, get_entry
+
     names = [m.name for m in config.models]
     if len(set(names)) != len(names):
         raise ConfigError("models: names must be unique")
@@ -286,6 +288,15 @@ def validate(config: Config) -> Config:
             raise ConfigError(
                 f"models[{m.name}]: backend '{m.backend}' not supported "
                 f"(supported: {sorted(SUPPORTED_BACKENDS)})"
+            )
+        try:
+            entry = get_entry(m.name)
+        except RegistryError as exc:
+            raise ConfigError(str(exc)) from exc
+        if entry.backend != m.backend:
+            raise ConfigError(
+                f"model '{m.name}': config backend '{m.backend}' "
+                f"!= registry backend '{entry.backend}'"
             )
 
     if any(m.backend == "mlforecast" for m in config.models):
@@ -339,10 +350,9 @@ def load_config(path: str | Path) -> Config:
 
 
 def generate_run_id() -> str:
-    """``tsforecasting-<UTC timestamp YYYYmmddHHMMSS>-<sha8>`` (sortable)."""
+    """``tsforecasting-<UTC timestamp YYYYmmddHHMMSS>-<random8>`` (sortable)."""
     ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-    short = hashlib.sha256(ts.encode("utf-8")).hexdigest()[:8]
-    return f"tsforecasting-{ts}-{short}"
+    return f"tsforecasting-{ts}-{secrets.token_hex(4)}"
 
 
 def resolve_overrides(
@@ -364,4 +374,4 @@ def resolve_overrides(
         config.runtime.log_name = log_name
     if log_level is not None:
         config.runtime.log_level = log_level.upper()
-    return config
+    return validate(config)

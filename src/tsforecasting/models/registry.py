@@ -10,9 +10,10 @@ from __future__ import annotations
 
 import importlib
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from tsforecasting.config import Config, ModelConfig
+if TYPE_CHECKING:
+    from tsforecasting.config import Config, ModelConfig
 
 
 class RegistryError(ValueError):
@@ -172,7 +173,7 @@ def _import_class(class_path: str) -> type:
     return getattr(module, cls_name)
 
 
-def build_model(model: ModelConfig) -> BuiltModel:
+def build_model(model: "ModelConfig") -> BuiltModel:
     entry = get_entry(model.name)
     if entry.backend != model.backend:
         raise RegistryError(
@@ -200,6 +201,6 @@ def build_model(model: ModelConfig) -> BuiltModel:
     )
 
 
-def build_models(config: Config) -> list[BuiltModel]:
+def build_models(config: "Config") -> list[BuiltModel]:
     """Instantiate one BuiltModel per entry in ``config.models``."""
     return [build_model(m) for m in config.models]

@@ -86,6 +86,21 @@ def test_unsupported_backend_raises(tmp_path: Path) -> None:
         load_config(_write(tmp_path, data))
 
 
+def test_unknown_model_name_raises(tmp_path: Path) -> None:
+    data = _base()
+    data["models"][0]["name"] = "does_not_exist"
+    with pytest.raises(ConfigError, match="not in registry"):
+        load_config(_write(tmp_path, data))
+
+
+def test_model_backend_mismatch_raises(tmp_path: Path) -> None:
+    data = _base()
+    data["models"][0]["name"] = "linear_regression"
+    data["models"][0]["backend"] = "statsforecast"
+    with pytest.raises(ConfigError, match="registry backend"):
+        load_config(_write(tmp_path, data))
+
+
 def test_mlforecast_backend_requires_section(tmp_path: Path) -> None:
     data = _base()
     data["models"].append({"name": "linear_regression", "backend": "mlforecast", "params": {}})
@@ -182,6 +197,12 @@ def test_generate_run_id_format() -> None:
     assert _RUN_ID_RE.match(run_id), run_id
 
 
+def test_generate_run_id_unique_within_same_second() -> None:
+    run_ids = [generate_run_id() for _ in range(10)]
+    assert all(_RUN_ID_RE.match(run_id) for run_id in run_ids)
+    assert len(set(run_ids)) == len(run_ids)
+
+
 def test_resolve_overrides_applies_cli_values(tmp_path: Path) -> None:
     config = load_config(_write(tmp_path, _base()))
     resolve_overrides(
@@ -195,6 +216,12 @@ def test_resolve_overrides_applies_cli_values(tmp_path: Path) -> None:
     assert config.artifacts.output_dir == "results/x"
     assert config.runtime.log_name == "ln"
     assert config.runtime.log_level == "DEBUG"
+
+
+def test_resolve_overrides_bad_log_level_raises(tmp_path: Path) -> None:
+    config = load_config(_write(tmp_path, _base()))
+    with pytest.raises(ConfigError, match="log_level"):
+        resolve_overrides(config, log_level="NOTALEVEL")
 
 
 def test_resolve_overrides_defaults_run_id(tmp_path: Path) -> None:
@@ -219,3 +246,36 @@ def test_cli_validate_config_invalid_returns_nonzero(
     assert cli_main(["validate-config", "--config", str(path)]) == 1
     err = capsys.readouterr().err
     assert "config invalid" in err
+
+
+def test_cli_validate_config_unknown_model_returns_nonzero(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    data = _base()
+    data["models"][0]["name"] = "does_not_exist"
+    path = _write(tmp_path, data)
+    assert cli_main(["validate-config", "--config", str(path)]) == 1
+    err = capsys.readouterr().err
+    assert "config invalid" in err
+    assert "not in registry" in err
+
+
+def test_cli_run_dry_run_bad_log_level_returns_nonzero(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert (
+        cli_main(
+            [
+                "run",
+                "--config",
+                str(EXAMPLE),
+                "--dry-run",
+                "--log-level",
+                "NOTALEVEL",
+            ]
+        )
+        == 1
+    )
+    err = capsys.readouterr().err
+    assert "config invalid" in err
+    assert "log_level" in err
