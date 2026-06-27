@@ -23,34 +23,47 @@ from tsforecasting.evaluation.metrics import (
     compute_metrics,
 )
 from tsforecasting.models import build_models
-from tsforecasting.models.nixtla import StatsForecastAdapter
+from tsforecasting.models.nixtla import StatsForecastAdapter  # TODO 检查是否正确
 from tsforecasting.utils.logging import get_logger
 
 
 def _build_adapter(backend: str, df, group, freq: str, run_id: str, config: Config):
-    """Instantiate the adapter for ``backend`` (lazy-importing optional backends)."""
+    """
+    Instantiate the adapter for ``backend`` (lazy-importing optional backends).
+    """
+    # Prediction intervals
     levels = config.prediction_intervals.levels if config.prediction_intervals else None
+
     if backend == "statsforecast":
         return StatsForecastAdapter(df, group, freq, run_id, levels=levels)
+
     if backend == "mlforecast":
         from tsforecasting.models.nixtla.ml import MLForecastAdapter
-
         return MLForecastAdapter(df, group, freq, run_id, config.mlforecast, levels=levels)
+    
     if backend == "neuralforecast":
         from tsforecasting.models.nixtla.neural import NeuralForecastAdapter
-
         return NeuralForecastAdapter(df, group, freq, run_id, levels=levels)
+    
     raise ValueError(f"no adapter registered for backend '{backend}'")
 
 
 def run_pipeline(config: Config, *, do_predict: bool = True) -> Path:
-    """Execute the full pipeline and write artifacts under ``output_dir/run_id``."""
+    """
+    Execute the full pipeline and write artifacts under ``output_dir/run_id``.
+    """
+    # Set up logging
     os.environ["LOG_NAME"] = config.runtime.log_name
     os.environ["SERVICE_LOG_LEVEL"] = config.runtime.log_level
     logger = get_logger()
+    # Set seed
     np.random.seed(config.seed)
-
+    # ------------------------------
+    # Run
+    # ------------------------------
     logger.info("starting run_id=%s", config.run_id)
+
+    # Load data
     loaded = load_data(config.data)
     logger.info(
         "loaded %d rows / %d series (freq=%s, inferred=%s, missing=%d)",
@@ -65,24 +78,29 @@ def run_pipeline(config: Config, *, do_predict: bool = True) -> Path:
             "data has %d missing time points (not filled)", loaded.meta["missing_points"]
         )
 
+    # Build models
     built = build_models(config)
-    # Group models by backend; one batched adapter per backend (each backend
+    # TODO 修改注释为中文 Group models by backend; one batched adapter per backend (each backend
     # fits its models in one object). Predictions/backtest are concatenated so a
     # single run ranks models across backends.
     groups: dict[str, list] = defaultdict(list)
     for b in built:
         groups[b.backend].append(b)
 
+    # Predict and backtest
     prediction_parts: list[pd.DataFrame] = []
     backtest_parts: list[pd.DataFrame] = []
     timings: dict[str, dict[str, float]] = {}
     do_predict = do_predict and config.predict is not None
     for backend, group in groups.items():
+        # Build adapter
         adapter = _build_adapter(
             backend, loaded.df, group, loaded.meta["freq"], config.run_id, config
         )
+        # Predict
         if do_predict:
             prediction_parts.append(adapter.predict(config.predict.horizon))
+        # Backtest
         backtest_parts.append(
             adapter.cross_validation(
                 config.backtest.horizon,
@@ -90,24 +108,32 @@ def run_pipeline(config: Config, *, do_predict: bool = True) -> Path:
                 config.backtest.step_size,
             )
         )
+        # Timing metrics
         timings[backend] = adapter.timing
-
+    # ------------------------------
+    # TODO 补充注释
+    # ------------------------------
+    # TODO 补充注释
     predictions = (
         pd.concat(prediction_parts, ignore_index=True) if prediction_parts else None
     )
-    backtest = pd.concat(backtest_parts, ignore_index=True)
     if do_predict:
         logger.info("produced %d prediction rows", len(predictions))
+    # TODO 补充注释
+    backtest = pd.concat(backtest_parts, ignore_index=True)
     logger.info("produced %d backtest rows", len(backtest))
-
+    # TODO 补充注释
     metrics = compute_metrics(backtest, config.run_id)
+    # TODO 补充注释
     runtime_metrics = build_runtime_metrics(
         config.run_id, built, timings, loaded.meta["n_series"], loaded.meta["n_rows"]
     )
     model_comparison = build_model_comparison(
         metrics, runtime_metrics, config.evaluation.rank_metric
     )
-
+    # ------------------------------
+    # TODO 补充注释
+    # ------------------------------
     run_dir = Path(config.artifacts.output_dir) / config.run_id
     write_artifacts(
         run_dir,
@@ -117,8 +143,10 @@ def run_pipeline(config: Config, *, do_predict: bool = True) -> Path:
         model_comparison=model_comparison,
         predictions=predictions,
     )
+    # TODO 补充注释
     manifest = build_manifest(config, loaded.meta, built, run_dir, do_predict)
     write_manifest(manifest, run_dir)
+    # TODO 补充注释
     write_run_config(config, run_dir)
     logger.info("artifacts written to %s", run_dir)
     return run_dir

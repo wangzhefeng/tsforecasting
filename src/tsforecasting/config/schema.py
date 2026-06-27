@@ -22,7 +22,9 @@ VALID_LOG_LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
 
 
 class ConfigError(ValueError):
-    """Raised when a config file fails schema validation."""
+    """
+    Raised when a config file fails schema validation.
+    """
 
 
 @dataclass
@@ -58,7 +60,7 @@ class EvaluationConfig:
 class PredictConfig:
     horizon: int
 
-
+# TODO 注释修改为中文
 @dataclass
 class MLForecastConfig:
     """Shared MLForecast framework params (lags / date features / target transforms).
@@ -74,6 +76,7 @@ class MLForecastConfig:
     target_transforms: list[dict[str, Any]] | None = None
 
 
+# TODO 注释修改为中文
 @dataclass
 class PredictionIntervalsConfig:
     """Optional prediction-interval levels (Phase 2). When set, statsforecast
@@ -102,12 +105,12 @@ class Config:
     backtest: BacktestConfig
     models: list[ModelConfig]
     evaluation: EvaluationConfig
+    predict: PredictConfig | None = None
     runtime: RuntimeConfig
     artifacts: ArtifactsConfig
-    predict: PredictConfig | None = None
+    seed: int = 0
     mlforecast: MLForecastConfig | None = None
     prediction_intervals: PredictionIntervalsConfig | None = None
-    seed: int = 0
     # resolved at run time:
     run_id: str | None = None
     config_source: str | None = None
@@ -336,16 +339,24 @@ def validate(config: Config) -> Config:
 
 
 def load_config(path: str | Path) -> Config:
-    """Load and validate a YAML config file."""
+    """
+    Load and validate a YAML config file.
+    """
+    # 配置文件路径
     p = Path(path)
     if not p.is_file():
         raise ConfigError(f"config file not found: {path}")
+    # 读取配置文件
     raw = yaml.safe_load(p.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise ConfigError("config root must be a mapping")
+    # 根据配置文件生成配置
     config = _build_config(raw)
+    # 记录配置文件路径
     config.config_source = str(p.resolve())
+    # 校验配置
     validate(config)
+
     return config
 
 

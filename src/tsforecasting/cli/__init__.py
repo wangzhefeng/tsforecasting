@@ -14,6 +14,12 @@ _RUN_LEVEL_OVERRIDES = ("--run-id", "--output-dir", "--log-name", "--log-level")
 
 
 def _add_run_overrides(parser: argparse.ArgumentParser) -> None:
+    """
+    # TODO 补充注释
+
+    Args:
+        parser (argparse.ArgumentParser): _description_
+    """
     for opt in _RUN_LEVEL_OVERRIDES:
         parser.add_argument(opt, default=None)
     parser.add_argument("--dry-run", action="store_true")
@@ -26,47 +32,55 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
+    # TODO 补充注释
     p_validate = sub.add_parser(
         "validate-config",
         help="Validate a YAML config without reading data or training.",
     )
     p_validate.add_argument("--config", required=True)
-
+    # TODO 补充注释
     p_run = sub.add_parser(
         "run",
         help="Run backtest + evaluation (and future predict if configured).",
     )
     p_run.add_argument("--config", required=True)
     _add_run_overrides(p_run)
-
+    # TODO 补充注释
     p_backtest = sub.add_parser(
         "backtest",
         help="Run backtest + evaluation only (no future predict).",
     )
     p_backtest.add_argument("--config", required=True)
     _add_run_overrides(p_backtest)
-
+    # TODO 补充注释
     p_reconcile = sub.add_parser(
         "reconcile",
         help="Hierarchical reconciliation (P9: TourismSmall).",
     )
     p_reconcile.add_argument("--config", required=True)
     _add_run_overrides(p_reconcile)
-
+    # TODO 补充注释
     p_report = sub.add_parser(
         "report",
         help="Generate a notebook report from a run dir (P10).",
     )
     p_report.add_argument("--run-dir", required=True)
     p_report.add_argument("--output-dir", default="reports")
-    p_report.add_argument(
-        "--html", action="store_true", help="Also execute and export HTML (nbconvert)."
-    )
+    p_report.add_argument("--html", action="store_true", help="Also execute and export HTML (nbconvert).")
 
     return parser
 
 
 def _cmd_validate_config(args: argparse.Namespace) -> int:
+    """
+    # TODO 补充注释
+
+    Args:
+        args (argparse.Namespace): _description_
+
+    Returns:
+        int: _description_
+    """
     from tsforecasting.config import ConfigError, load_config
 
     try:
@@ -112,13 +126,16 @@ def _print_dry_run(label: str, config: object) -> None:
 
 def _cmd_run(args: argparse.Namespace) -> int:
     from tsforecasting.orchestration import run_pipeline
-
+    # TODO 补充注释
     config = _load_and_resolve(args)
+    # TODO 补充注释
     if config is None:
         return 1
+    # TODO 补充注释
     if args.dry_run:
         _print_dry_run("run", config)
         return 0
+    # TODO 补充注释
     run_dir = run_pipeline(config, do_predict=True)
     print(f"run complete: {run_dir}")
     return 0
