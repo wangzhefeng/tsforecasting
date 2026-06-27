@@ -26,6 +26,7 @@ Read these before implementation:
 
 - Package/project name is `tsforecasting`.
 - Internal forecasting data contract is Nixtla long table: `unique_id / ds / y`.
+- CLI public import stays `tsforecasting.cli:main`; keep `src/tsforecasting/cli/__init__.py` as a thin export and place parser/command handlers in focused `cli/*.py` modules.
 - MVP-0 is Nixtla-only StatsForecast first: `SeasonalNaive` / `AutoETS`, UtilsForecast metrics, core artifacts, and manifest.
 - MVP-1 adds MLForecast, NeuralForecast CPU smoke, and HierarchicalForecast with `TourismSmall`.
 - Each **forecast** backend is an adapter under `src/tsforecasting/models/nixtla/` mirroring `StatsForecastAdapter` (`predict`/`cross_validation` returning the canonical long contracts with the dense-rank `horizon` column + a `timing` dict); `src/tsforecasting/orchestration/run.py` groups models by backend, builds one adapter per backend, and lazy-imports optional backends so the base install stays importable. **Hierarchical reconciliation is a separate flow** (`config/hierarchical.py` + `reconciliation.py` + `orchestration/reconcile.py` + the `reconcile` CLI subcommand) with its own `HierarchicalConfig` and artifact set (`base_predictions` / `reconciled_predictions` / `reconciliation_diagnostics`), not a forecast adapter.

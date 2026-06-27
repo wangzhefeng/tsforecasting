@@ -59,6 +59,8 @@ class EvaluationConfig:
 @dataclass
 class PredictConfig:
     horizon: int
+
+
 @dataclass
 class MLForecastConfig:
     """MLForecast 后端共享的特征与变换参数。
@@ -72,6 +74,7 @@ class MLForecastConfig:
     lags: list[int]
     date_features: list[str] | None = None
     target_transforms: list[dict[str, Any]] | None = None
+
 
 @dataclass
 class PredictionIntervalsConfig:
@@ -103,9 +106,9 @@ class Config:
     backtest: BacktestConfig
     models: list[ModelConfig]
     evaluation: EvaluationConfig
-    predict: PredictConfig | None = None
     runtime: RuntimeConfig
     artifacts: ArtifactsConfig
+    predict: PredictConfig | None = None
     seed: int = 0
     mlforecast: MLForecastConfig | None = None
     prediction_intervals: PredictionIntervalsConfig | None = None

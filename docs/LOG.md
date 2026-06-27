@@ -9,6 +9,29 @@
 - 具体计划项状态记录在 `docs/PLAN.md` 的“计划项实现记录”。
 - 日志条目应包含日期、类型、摘要、涉及文件、验证命令、结果和下一步。
 
+## 2026-06-27 - CLI 模块职责拆分
+
+- 类型：chore（结构重组）+ fix
+- 摘要：按用户 review 将 `src/tsforecasting/cli/__init__.py` 从单文件 CLI 实现拆成职责清晰的子模块。`__init__.py` 只保留 `main` 公开导出；`main.py` 负责 dispatch；`parser.py` 负责 argparse；`forecast.py`、`validate.py`、`hierarchical.py`、`report.py` 分别承载对应子命令实现。外部入口 `tsforecasting.cli:main`、命令名、参数、输出文本和返回码保持不变。验证时发现并修复 `Config` dataclass 字段顺序问题：必填 `runtime`/`artifacts` 不能位于默认字段 `predict` 之后，否则测试收集阶段会失败。
+- 涉及文件：
+  - `src/tsforecasting/cli/__init__.py`
+  - `src/tsforecasting/cli/{main,parser,forecast,validate,hierarchical,report}.py`
+  - `src/tsforecasting/config/schema.py`
+  - `AGENTS.md`、`CLAUDE.md`
+  - `docs/unified-ts-framework-plan-v2.md`、`docs/PLAN.md`、`docs/LOG.md`
+- 验证命令：
+
+```bash
+UV_CACHE_DIR=.uv_cache uv run ruff check src/tsforecasting/cli tests/unit/test_config.py tests/unit/test_hierarchical.py tests/integration/test_run_smoke.py tests/integration/test_reconcile_smoke.py
+UV_CACHE_DIR=.uv_cache uv run pytest -q tests/unit/test_config.py tests/unit/test_hierarchical.py tests/integration/test_run_smoke.py tests/integration/test_reconcile_smoke.py
+UV_CACHE_DIR=.uv_cache uv run tsforecasting validate-config --config configs/examples/ett_small/stats.yaml
+UV_CACHE_DIR=.uv_cache uv run tsforecasting run --config configs/examples/ett_small/stats.yaml --dry-run
+UV_CACHE_DIR=.uv_cache uv run tsforecasting reconcile --config configs/examples/tourism_small/hierarchical.yaml --dry-run
+```
+
+- 结果：通过。`ruff` All checks passed；CLI 相关测试 `49 passed in 53.43s`；三个 CLI smoke check 均返回 0。
+- 下一步：后续新增 CLI 子命令时继续沿用模块拆分边界，避免把命令实现放回 `cli/__init__.py`。
+
 ## 2026-06-27 - neat-freak 知识同步收尾
 
 - 类型：docs（知识整理）+ memory
