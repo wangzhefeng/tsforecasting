@@ -59,29 +59,27 @@ class EvaluationConfig:
 @dataclass
 class PredictConfig:
     horizon: int
-
-# TODO 注释修改为中文
 @dataclass
 class MLForecastConfig:
-    """Shared MLForecast framework params (lags / date features / target transforms).
+    """MLForecast 后端共享的特征与变换参数。
 
-    MLForecast wraps all its inner models in one framework object that shares
-    these feature/transform settings, so they live at the top level rather than
-    per-model. ``target_transforms`` is a serializable spec (``{class, args?,
-    kwargs?}``) resolved by the adapter, keeping ``run_config.yaml`` YAML-safe.
+    MLForecast 会把同一后端下的多个内部模型包装到一个框架对象中，
+    因此 lags、日期特征和目标变换属于后端级配置，而不是单个模型配置。
+    ``target_transforms`` 使用可序列化描述（``{class, args?, kwargs?}``），
+    由 adapter 在运行时解析，确保 ``run_config.yaml`` 仍然是安全的 YAML。
     """
 
     lags: list[int]
     date_features: list[str] | None = None
     target_transforms: list[dict[str, Any]] | None = None
 
-
-# TODO 注释修改为中文
 @dataclass
 class PredictionIntervalsConfig:
-    """Optional prediction-interval levels (Phase 2). When set, statsforecast
-    forecasts/backtests append ``lo-{level}``/``hi-{level}`` columns and the
-    evaluator computes coverage/width per level."""
+    """可选预测区间配置。
+
+    设置后，支持的后端会在预测和回测结果中追加 ``lo-{level}`` /
+    ``hi-{level}`` 列，评估阶段也会按区间层级计算 coverage 和 width。
+    """
 
     levels: list[int]
 

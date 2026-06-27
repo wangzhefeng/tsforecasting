@@ -15,10 +15,10 @@ _RUN_LEVEL_OVERRIDES = ("--run-id", "--output-dir", "--log-name", "--log-level")
 
 def _add_run_overrides(parser: argparse.ArgumentParser) -> None:
     """
-    # TODO 补充注释
+    为会产生运行目录的命令添加通用运行级覆盖参数。
 
     Args:
-        parser (argparse.ArgumentParser): _description_
+        parser (argparse.ArgumentParser): 需要追加参数的子命令解析器。
     """
     for opt in _RUN_LEVEL_OVERRIDES:
         parser.add_argument(opt, default=None)
@@ -32,34 +32,34 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    # TODO 补充注释
+    # 仅校验 YAML 配置结构和模型注册信息，不读取数据或训练模型。
     p_validate = sub.add_parser(
         "validate-config",
         help="Validate a YAML config without reading data or training.",
     )
     p_validate.add_argument("--config", required=True)
-    # TODO 补充注释
+    # 完整预测流程：回测、评估，并在配置 predict 时输出未来预测。
     p_run = sub.add_parser(
         "run",
         help="Run backtest + evaluation (and future predict if configured).",
     )
     p_run.add_argument("--config", required=True)
     _add_run_overrides(p_run)
-    # TODO 补充注释
+    # 只执行历史回测和评估，不生成未来预测。
     p_backtest = sub.add_parser(
         "backtest",
         help="Run backtest + evaluation only (no future predict).",
     )
     p_backtest.add_argument("--config", required=True)
     _add_run_overrides(p_backtest)
-    # TODO 补充注释
+    # 独立的层级预测协调流程，使用 HierarchicalConfig。
     p_reconcile = sub.add_parser(
         "reconcile",
         help="Hierarchical reconciliation (P9: TourismSmall).",
     )
     p_reconcile.add_argument("--config", required=True)
     _add_run_overrides(p_reconcile)
-    # TODO 补充注释
+    # 从已有运行目录生成 notebook 报告，可选执行并导出 HTML。
     p_report = sub.add_parser(
         "report",
         help="Generate a notebook report from a run dir (P10).",
@@ -73,13 +73,13 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _cmd_validate_config(args: argparse.Namespace) -> int:
     """
-    # TODO 补充注释
+    执行配置校验命令，并用进程返回码表达校验结果。
 
     Args:
-        args (argparse.Namespace): _description_
+        args (argparse.Namespace): argparse 解析出的命令行参数。
 
     Returns:
-        int: _description_
+        int: 配置有效时返回 0，配置无效时返回 1。
     """
     from tsforecasting.config import ConfigError, load_config
 
@@ -126,16 +126,16 @@ def _print_dry_run(label: str, config: object) -> None:
 
 def _cmd_run(args: argparse.Namespace) -> int:
     from tsforecasting.orchestration import run_pipeline
-    # TODO 补充注释
+    # 加载配置并应用运行级覆盖；非法配置在这里转为友好的 CLI 错误。
     config = _load_and_resolve(args)
-    # TODO 补充注释
+    # 配置解析失败时停止执行，避免进入数据读取或模型训练。
     if config is None:
         return 1
-    # TODO 补充注释
+    # dry-run 只展示最终生效的运行计划，不产生 artifact。
     if args.dry_run:
         _print_dry_run("run", config)
         return 0
-    # TODO 补充注释
+    # run 命令包含未来预测，因此 do_predict=True。
     run_dir = run_pipeline(config, do_predict=True)
     print(f"run complete: {run_dir}")
     return 0

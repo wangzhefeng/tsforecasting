@@ -23,7 +23,7 @@ from tsforecasting.evaluation.metrics import (
     compute_metrics,
 )
 from tsforecasting.models import build_models
-from tsforecasting.models.nixtla import StatsForecastAdapter  # TODO 检查是否正确
+from tsforecasting.models.nixtla import StatsForecastAdapter
 from tsforecasting.utils.logging import get_logger
 
 
@@ -80,9 +80,8 @@ def run_pipeline(config: Config, *, do_predict: bool = True) -> Path:
 
     # Build models
     built = build_models(config)
-    # TODO 修改注释为中文 Group models by backend; one batched adapter per backend (each backend
-    # fits its models in one object). Predictions/backtest are concatenated so a
-    # single run ranks models across backends.
+    # 按后端分组模型；每个后端用一个批量 adapter 承载同组模型。
+    # 各后端输出会在后续拼接，使一次运行可以跨后端统一评估和排序。
     groups: dict[str, list] = defaultdict(list)
     for b in built:
         groups[b.backend].append(b)
@@ -111,20 +110,20 @@ def run_pipeline(config: Config, *, do_predict: bool = True) -> Path:
         # Timing metrics
         timings[backend] = adapter.timing
     # ------------------------------
-    # TODO 补充注释
+    # 归一化输出
     # ------------------------------
-    # TODO 补充注释
+    # 预测结果是可选产物：backtest 命令或未配置 predict 时不会生成。
     predictions = (
         pd.concat(prediction_parts, ignore_index=True) if prediction_parts else None
     )
     if do_predict:
         logger.info("produced %d prediction rows", len(predictions))
-    # TODO 补充注释
+    # 回测结果是评估和模型排名的必需输入。
     backtest = pd.concat(backtest_parts, ignore_index=True)
     logger.info("produced %d backtest rows", len(backtest))
-    # TODO 补充注释
+    # 基于回测真实值与预测值计算点预测指标。
     metrics = compute_metrics(backtest, config.run_id)
-    # TODO 补充注释
+    # 将各后端 adapter 记录的耗时扩展为模型级运行指标。
     runtime_metrics = build_runtime_metrics(
         config.run_id, built, timings, loaded.meta["n_series"], loaded.meta["n_rows"]
     )
@@ -132,7 +131,7 @@ def run_pipeline(config: Config, *, do_predict: bool = True) -> Path:
         metrics, runtime_metrics, config.evaluation.rank_metric
     )
     # ------------------------------
-    # TODO 补充注释
+    # 写出产物
     # ------------------------------
     run_dir = Path(config.artifacts.output_dir) / config.run_id
     write_artifacts(
@@ -143,10 +142,10 @@ def run_pipeline(config: Config, *, do_predict: bool = True) -> Path:
         model_comparison=model_comparison,
         predictions=predictions,
     )
-    # TODO 补充注释
+    # manifest 记录本次运行的数据映射、模型、配置和产物路径。
     manifest = build_manifest(config, loaded.meta, built, run_dir, do_predict)
     write_manifest(manifest, run_dir)
-    # TODO 补充注释
+    # 保存解析并应用 override 后的最终配置，便于复现。
     write_run_config(config, run_dir)
     logger.info("artifacts written to %s", run_dir)
     return run_dir
