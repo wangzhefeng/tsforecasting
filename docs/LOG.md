@@ -9,6 +9,28 @@
 - 具体计划项状态记录在 `docs/PLAN.md` 的“计划项实现记录”。
 - 日志条目应包含日期、类型、摘要、涉及文件、验证命令、结果和下一步。
 
+## 2026-06-29 - 补 adapter/registry TODO 注释并清理格式
+
+- 类型:docs(注释整理,P25 延续)
+- 摘要:接手工作区 WIP,把 stats/ml/neural adapter(`predict`/`cross_validation` 各步)和 registry(`get_entry`/`build_model`)的 `# TODO 补充注释` 占位替换为 P25 风格中文注释,说明每块职责而非逐行翻译;顺带把 registry 多行空包裹 docstring(`RegistryError`/`build_models`)规范为单行,清理 stats/neural 的行尾空格,evaluation `__all__` 恢复单行。无行为变更。
+- 涉及文件:
+  - `src/tsforecasting/models/nixtla/ml.py`
+  - `src/tsforecasting/models/nixtla/stats.py`
+  - `src/tsforecasting/models/nixtla/neural.py`
+  - `src/tsforecasting/models/registry.py`
+  - `src/tsforecasting/evaluation/__init__.py`(恢复 committed 单行 `__all__`)
+- 验证命令:
+
+```bash
+grep -rn "TODO 补充注释" src/ tests/ --include="*.py"   # 0 残留
+grep -rnE ' +$' src/tsforecasting/models/ src/tsforecasting/evaluation/  # 无行尾空格
+.venv/bin/ruff check .
+.venv/bin/python -m pytest -q
+```
+
+- 结果:通过。0 TODO 残留、无行尾空格、ruff clean、pytest 93 passed / 20 warnings。
+- 下一步:—
+
 ## 2026-06-28 - 修复 nixtla 包可选 backend import 泄漏
 
 - 类型:fix(import 契约)

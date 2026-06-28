@@ -149,15 +149,16 @@ REGISTRY: list[RegistryEntry] = [
 
 
 def get_entry(model_name: str) -> RegistryEntry:
+    """按 ``model_name`` 查 REGISTRY 条目;未知名称抛 RegistryError 并列出已知模型。"""
     index = {entry.model_name: entry for entry in REGISTRY}
     if model_name not in index:
-        raise RegistryError(
-            f"model '{model_name}' not in registry; known: {sorted(index)}"
-        )
+        raise RegistryError(f"model '{model_name}' not in registry; known: {sorted(index)}")
+
     return index[model_name]
 
 
 def build_model(model: "ModelConfig") -> BuiltModel:
+    """校验 backend 一致后动态 import 模型类,把可序列化 loss spec 转成实例再实例化。"""
     entry = get_entry(model.name)
     if entry.backend != model.backend:
         raise RegistryError(

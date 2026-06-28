@@ -90,6 +90,8 @@ class MLForecastAdapter:
         return {col: self._built[i].name for i, col in enumerate(model_cols)}
 
     def predict(self, h: int) -> pd.DataFrame:
+        # 训练:同一 backend 的所有模型批量 fit;配置预测区间时需先注入
+        # PredictionIntervals,后续 predict 才能用 conformal 方法产出 lo-/hi-。
         t0 = time.perf_counter()
         if self._levels:
             from mlforecast.utils import PredictionIntervals
@@ -101,6 +103,7 @@ class MLForecastAdapter:
             self._mlf.fit(self._df)
         self.timing["fit_seconds"] += time.perf_counter() - t0
 
+        # 预测:生成未来 h 步点预测;配置区间时传 level 触发 conformal 区间列。
         t0 = time.perf_counter()
         if self._levels:
             fcst = self._mlf.predict(h, level=self._levels)
@@ -108,6 +111,7 @@ class MLForecastAdapter:
             fcst = self._mlf.predict(h)
         self.timing["predict_seconds"] += time.perf_counter() - t0
 
+        # 归一:挑出模型点预测列,wide -> long,再补 backend / run_id 元数据。
         pure = [
             c
             for c in fcst.columns
@@ -117,17 +121,18 @@ class MLForecastAdapter:
         long = melt_forecast_long(fcst, NON_MODEL_COLS_FORECAST, name_map, self._levels)
         long["backend"] = self.backend
         long["run_id"] = self.run_id
+
         return long[list(PREDICTIONS_COLUMNS) + interval_columns(self._levels)]
 
-    def cross_validation(
-        self, h: int, n_windows: int, step_size: int
-    ) -> pd.DataFrame:
+    def cross_validation(self, h: int, n_windows: int, step_size: int) -> pd.DataFrame:
+        # rolling-origin 交叉验证并计时;MLForecast 的 cv 不产出区间列。
         t0 = time.perf_counter()
         cv = self._mlf.cross_validation(
             df=self._df, n_windows=n_windows, h=h, step_size=step_size
         )
         self.timing["cross_validation_seconds"] += time.perf_counter() - t0
 
+        # 归一:cv 的 wide 输出 melt 成长表,排序后派生 horizon 步数。
         model_cols = [c for c in cv.columns if c not in NON_MODEL_COLS_CV]
         name_map = self._name_map(model_cols)
         long = cv.melt(
@@ -142,9 +147,10 @@ class MLForecastAdapter:
         long = long.sort_values(["unique_id", "cutoff", "model", "ds"]).reset_index(
             drop=True
         )
-        # horizon 表示同一 (unique_id, cutoff) 窗口内 ds 的步数；rank 比直接
+        # horizon 表示同一 (unique_id, cutoff) 窗口内 ds 的步数;rank 比直接
         # 用时间差除 freq 更能容忍 pandas/上游的频率表示差异。
         long = add_dense_horizon(long)
+
         return long[list(BACKTEST_PREDICTIONS_COLUMNS)]
 
     @property

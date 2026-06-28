@@ -47,7 +47,9 @@ class StatsForecastAdapter:
         self.run_id = run_id
         self._levels = list(levels) if levels else None
         self._sf = StatsForecast(
-            models=[m.instance for m in built_models], freq=freq, n_jobs=n_jobs
+            models=[m.instance for m in built_models],
+            freq=freq,
+            n_jobs=n_jobs,
         )
         self.timing: dict[str, float] = {
             "fit_seconds": 0.0,
@@ -58,16 +60,16 @@ class StatsForecastAdapter:
     def _name_map(self, model_cols: list[str]) -> dict[str, str]:
         """按上游输出列顺序映射回配置里的模型名。"""
         if len(model_cols) != len(self._built):
-            raise ValueError(
-                f"model column count {len(model_cols)} != built models {len(self._built)}"
-            )
+            raise ValueError(f"model column count {len(model_cols)} != built models {len(self._built)}")
         return {col: self._built[i].name for i, col in enumerate(model_cols)}
 
     def predict(self, h: int) -> pd.DataFrame:
+        # 训练:在历史数据上拟合所有模型,记录 fit 耗时。
         t0 = time.perf_counter()
         self._sf.fit(self._df)
         self.timing["fit_seconds"] += time.perf_counter() - t0
 
+        # 预测:生成未来 h 步预测;配置区间时传 level 让上游原生产出 lo-/hi- 列。
         t0 = time.perf_counter()
         if self._levels:
             fcst = self._sf.predict(h=h, level=self._levels)
@@ -75,6 +77,7 @@ class StatsForecastAdapter:
             fcst = self._sf.predict(h=h)
         self.timing["predict_seconds"] += time.perf_counter() - t0
 
+        # 归一:挑出模型点预测列,wide -> long,补 backend / run_id 元数据。
         pure = [
             c
             for c in fcst.columns
@@ -85,21 +88,27 @@ class StatsForecastAdapter:
         long["run_id"] = self.run_id
         return long[list(PREDICTIONS_COLUMNS) + interval_columns(self._levels)]
 
-    def cross_validation(
-        self, h: int, n_windows: int, step_size: int
-    ) -> pd.DataFrame:
+    def cross_validation(self, h: int, n_windows: int, step_size: int) -> pd.DataFrame:
+        # rolling-origin 交叉验证并计时;配置区间时一并产出 lo-/hi- 列。
         t0 = time.perf_counter()
         if self._levels:
             cv = self._sf.cross_validation(
-                df=self._df, h=h, n_windows=n_windows, step_size=step_size,
+                df=self._df,
+                h=h,
+                n_windows=n_windows,
+                step_size=step_size,
                 level=self._levels,
             )
         else:
             cv = self._sf.cross_validation(
-                df=self._df, h=h, n_windows=n_windows, step_size=step_size
+                df=self._df,
+                h=h,
+                n_windows=n_windows,
+                step_size=step_size,
             )
         self.timing["cross_validation_seconds"] += time.perf_counter() - t0
 
+        # 归一:cv 的 wide 输出 melt 成长表,排序后派生 horizon 步数。
         pure = [
             c
             for c in cv.columns
@@ -112,6 +121,7 @@ class StatsForecastAdapter:
             drop=True
         )
         long = add_dense_horizon(long)
+
         return long[list(BACKTEST_PREDICTIONS_COLUMNS) + interval_columns(self._levels)]
 
     @property

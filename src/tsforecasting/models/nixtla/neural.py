@@ -48,6 +48,7 @@ def _make_lightning_logger():
         from lightning.pytorch.loggers import TensorBoardLogger
     except ImportError:  # 兼容较旧的 neuralforecast 依赖组合。
         from pytorch_lightning.loggers import TensorBoardLogger
+
     return TensorBoardLogger(save_dir="logs", name="lightning")
 
 
@@ -100,21 +101,22 @@ class NeuralForecastAdapter:
 
     def _name_map(self, model_cols: list[str]) -> dict[str, str]:
         if len(model_cols) != len(self._built):
-            raise ValueError(
-                f"model column count {len(model_cols)} != built models {len(self._built)}"
-            )
+            raise ValueError(f"model column count {len(model_cols)} != built models {len(self._built)}")
         return {col: self._built[i].name for i, col in enumerate(model_cols)}
 
     def predict(self, h: int) -> pd.DataFrame:
+        # 训练:val_size=h 用预测窗口长度做验证集(上游 fit 语义需要),记录耗时。
         t0 = time.perf_counter()
         self._nf.fit(self._df, val_size=h)
         self.timing["fit_seconds"] += time.perf_counter() - t0
 
+        # 预测:生成未来 h 步预测并计时。
         t0 = time.perf_counter()
         # quantile-loss 模型按自身 quantile 输出 lo/hi；predict 阶段不再传 level。
         fcst = self._nf.predict(h=h)
         self.timing["predict_seconds"] += time.perf_counter() - t0
 
+        # 归一:先归一 neural 列名(lo-80.0 -> lo-80、median -> 点),再 wide -> long。
         fcst = _normalize_neural_cols(fcst)
         pure = [
             c
@@ -126,21 +128,29 @@ class NeuralForecastAdapter:
         long["run_id"] = self.run_id
         return long[list(PREDICTIONS_COLUMNS) + interval_columns(self._levels)]
 
-    def cross_validation(
-        self, h: int, n_windows: int, step_size: int
-    ) -> pd.DataFrame:
+    def cross_validation(self, h: int, n_windows: int, step_size: int) -> pd.DataFrame:
+        # rolling-origin 交叉验证;val_size=h 提供验证窗口,配置区间时传 level。
         t0 = time.perf_counter()
         if self._levels:
             cv = self._nf.cross_validation(
-                df=self._df, h=h, n_windows=n_windows, step_size=step_size,
-                val_size=h, level=self._levels,
+                df=self._df,
+                h=h,
+                n_windows=n_windows,
+                step_size=step_size,
+                val_size=h,
+                level=self._levels,
             )
         else:
             cv = self._nf.cross_validation(
-                df=self._df, h=h, n_windows=n_windows, step_size=step_size, val_size=h
+                df=self._df,
+                h=h,
+                n_windows=n_windows,
+                step_size=step_size,
+                val_size=h,
             )
         self.timing["cross_validation_seconds"] += time.perf_counter() - t0
 
+        # 归一:列名归一后 cv 的 wide -> long,排序并派生 horizon 步数。
         cv = _normalize_neural_cols(cv)
         pure = [
             c
@@ -154,6 +164,7 @@ class NeuralForecastAdapter:
             drop=True
         )
         long = add_dense_horizon(long)
+
         return long[list(BACKTEST_PREDICTIONS_COLUMNS) + interval_columns(self._levels)]
 
     @property
