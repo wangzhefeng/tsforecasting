@@ -3196,6 +3196,7 @@ name = "tsforecasting"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "nbformat" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "pyyaml" },
@@ -3238,6 +3239,7 @@ requires-dist = [
     { name = "matplotlib", marker = "extra == 'plot'" },
     { name = "mlforecast", marker = "extra == 'ml'" },
     { name = "nbconvert", marker = "extra == 'report'" },
+    { name = "nbformat", specifier = ">=5.10.4" },
     { name = "nbformat", marker = "extra == 'report'" },
     { name = "neuralforecast", marker = "extra == 'neural'" },
     { name = "numpy", specifier = ">=1.26,<2.5" },

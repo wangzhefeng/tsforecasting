@@ -20,11 +20,14 @@ def _add_run_overrides(parser: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """构建完整 CLI parser；这里只声明参数，不执行业务逻辑。"""
+    """
+    构建完整 CLI parser；这里只声明参数，不执行业务逻辑。
+    """
     parser = argparse.ArgumentParser(
         prog="tsforecasting",
         description="Unified time-series forecasting on the Nixtla stack.",
     )
+    # 所有业务能力通过子命令进入，避免顶层参数和运行参数混在一起。
     sub = parser.add_subparsers(dest="command", required=True)
 
     # 仅校验 YAML 配置结构和模型注册信息，不读取数据或训练模型。
@@ -33,6 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Validate a YAML config without reading data or training.",
     )
     p_validate.add_argument("--config", required=True)
+
     # 完整预测流程：回测、评估，并在配置 predict 时输出未来预测。
     p_run = sub.add_parser(
         "run",
@@ -40,6 +44,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_run.add_argument("--config", required=True)
     _add_run_overrides(p_run)
+
     # 只执行历史回测和评估，不生成未来预测。
     p_backtest = sub.add_parser(
         "backtest",
@@ -47,6 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_backtest.add_argument("--config", required=True)
     _add_run_overrides(p_backtest)
+
     # 独立的层级预测协调流程，使用 HierarchicalConfig。
     p_reconcile = sub.add_parser(
         "reconcile",
@@ -54,6 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_reconcile.add_argument("--config", required=True)
     _add_run_overrides(p_reconcile)
+
     # 从已有运行目录生成 notebook 报告，可选执行并导出 HTML。
     p_report = sub.add_parser(
         "report",

@@ -13,9 +13,14 @@ from tsforecasting.cli.validate import cmd_validate_config
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """解析参数并按子命令分发；作为 console script 的稳定入口。"""
+    """
+    解析参数并按子命令分发；作为 console script 的稳定入口。
+    """
+    # parser 只声明 CLI 结构；这里统一解析 argv，便于测试直接传参。
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    # 子命令名到处理函数的唯一分发表，保持 console script 入口很薄。
     dispatch = {
         "validate-config": cmd_validate_config,
         "run": cmd_run,

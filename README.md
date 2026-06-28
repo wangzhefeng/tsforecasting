@@ -9,8 +9,8 @@
   - `validate-config` / `run` / `backtest` — MVP-0 多 backend 预测/回测，跨 backend 统一排名。
   - `reconcile` — P9 TourismSmall 层级协调（独立流程）。
   - `report` — P10 从 run artifacts 生成 notebook（`--html` 执行导出 HTML）。
-- Base 依赖：`statsforecast`、`utilsforecast`、`pyyaml`、`numpy`、`pandas`。
-- Extras：`ml`（MLForecast + scikit-learn）/ `neural`（NeuralForecast）/ `hierarchical`（HierarchicalForecast + datasetsforecast）/ `plot`（matplotlib）/ `report`（nbformat/nbconvert/ipykernel）；dev 组：`pytest`、`ruff`。**三 backend 均已实现**。
+- Base 依赖：`statsforecast`、`utilsforecast`、`pyyaml`、`numpy`、`pandas`、`nbformat`。
+- Extras：`ml`（MLForecast + scikit-learn）/ `neural`（NeuralForecast）/ `hierarchical`（HierarchicalForecast + datasetsforecast）/ `plot`（matplotlib）/ `report`（nbconvert/ipykernel，用于执行并导出 HTML）；dev 组：`pytest`、`ruff`。**三 backend 均已实现**。
 - 依赖版本上限是硬约束：Nixtla 硬钉 `pandas<3`，numba（经 `statsforecast` 传递依赖）钉 `numpy<2.5`，升级前必须先做 spike（见 `docs/LOG.md` P1）。
 
 ## 快速开始
@@ -19,6 +19,7 @@
 uv sync                                                                   # base + dev
 uv run tsforecasting validate-config --config configs/examples/ett_small/stats.yaml
 uv run tsforecasting run --config configs/examples/ett_small/stats.yaml   # results/{run_id}/
+scripts/ett_small/run_stats.sh --dry-run                                  # 映射见 scripts/script_config_map.yaml
 uv run pytest && uv run ruff check .
 ```
 
@@ -29,6 +30,7 @@ uv run pytest && uv run ruff check .
 | `ett_small/stats.yaml` | StatsForecast `SeasonalNaive`/`AutoETS` | base |
 | `ett_small/ml.yaml` | 混合 StatsForecast + MLForecast | `ml` |
 | `ett_small/neural.yaml` | 混合 StatsForecast + NeuralForecast NHITS（CPU smoke） | `neural` |
+| `ett_small/intervals.yaml` | StatsForecast + 预测区间（levels 80/95） | base |
 | `ett_small/intervals_mixed.yaml` | 三 backend + 预测区间（levels 80） | `neural`+`ml` |
 | `tourism_small/hierarchical.yaml` | TourismSmall 层级协调（季度） | `hierarchical` |
 
@@ -43,7 +45,7 @@ uv run pytest && uv run ruff check .
 
 ## 文档入口
 
-- [docs/PLAN.md](docs/PLAN.md) — 可执行开发计划与计划项实现记录（**P1–P15/P20–P25 已完成**；P16–P19 Phase 2 backlog）。
+- [docs/PLAN.md](docs/PLAN.md) — 可执行开发计划与计划项实现记录（**P1–P15/P20–P28 已完成**；P16–P19 Phase 2 backlog）。
 - [docs/model_catalog.md](docs/model_catalog.md) — full Nixtla model catalog（78 条 stats/neural/ml 模型 + 来源 + 验证状态）。
 - [docs/unified-ts-framework-plan-v2.md](docs/unified-ts-framework-plan-v2.md) — 当前实施基线（契约 / 架构）。
 - [docs/unified-ts-framework-plan-v1.md](docs/unified-ts-framework-plan-v1.md) — v1 历史基线，**已被 v2 取代**，仅作设计史保留，勿据其 §5/§6 实施。

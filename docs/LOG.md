@@ -9,6 +9,84 @@
 - 具体计划项状态记录在 `docs/PLAN.md` 的“计划项实现记录”。
 - 日志条目应包含日期、类型、摘要、涉及文件、验证命令、结果和下一步。
 
+## 2026-06-28 - neat-freak 知识入口同步
+
+- 类型：docs（知识整理）+ memory
+- 摘要：按 `neat-freak` 做会话收尾。尺寸体检确认 README/AGENTS/CLAUDE/docs 未膨胀；同步 README、AGENTS、CLAUDE 中的当前依赖与运行入口：base 依赖包含 `nbformat`，`report` extra 聚焦 HTML 导出，示例运行脚本按 `scripts/<dataset>/` 分类并由 `scripts/script_config_map.yaml` 维护；README 文档入口状态从 P25 更新到 P28，并补充 `ett_small/intervals.yaml` 示例配置。
+- 涉及文件：
+  - `README.md`
+  - `AGENTS.md`
+  - `CLAUDE.md`
+  - `docs/PLAN.md`
+  - `docs/LOG.md`
+  - 记忆 note：`/Users/wangzf/.codex/memories/extensions/ad_hoc/notes/2026-06-28T21-20-34-tsforecasting-scripts-cli-sync.md`
+- 验证命令：
+
+```bash
+wc -l AGENTS.md CLAUDE.md README.md docs/*.md
+rg -n "今天|昨天|刚刚|最近|上周|today|yesterday|recently" AGENTS.md CLAUDE.md README.md docs/PLAN.md docs/unified-ts-framework-plan-v2.md
+uv run pytest -q tests/unit/test_scripts.py tests/unit/test_config.py
+uv run ruff check .
+```
+
+- 结果：通过。关键文档尺寸未超限；相对时间 grep 0 命中；脚本/config 单元测试通过；`ruff` All checks passed。
+- 下一步：后续新增示例配置时同步 `scripts/<dataset>/`、`scripts/script_config_map.yaml`、README 示例表和脚本契约测试。
+
+## 2026-06-28 - 手动占位注释清理与 CLI 分发恢复
+
+- 类型：fix（占位注释清理 / CLI 兼容性）
+- 摘要：分析手动修改后发现占位注释实际位于 CLI 与 config 模块。清理 `cli/main.py`、`cli/parser.py`、`config/common.py`、`config/hierarchical.py` 中的占位注释；恢复 `parser.py` 只构建 parser、`main.py` 统一 parse+dispatch 的边界；移除手动调试打印，避免不同子命令读取不存在的 argparse 字段导致 `AttributeError`。用户新增的 `utils/log_util.py` 保留，仅按 ruff 要求调整 import 顺序。
+- 涉及文件：
+  - `src/tsforecasting/cli/main.py`
+  - `src/tsforecasting/cli/parser.py`
+  - `src/tsforecasting/config/common.py`
+  - `src/tsforecasting/config/hierarchical.py`
+  - `src/tsforecasting/utils/log_util.py`
+  - `docs/PLAN.md`、`docs/LOG.md`
+- 验证命令：
+
+```bash
+rg -n "<占位标记正则>" . --glob '!./.venv/**' --glob '!./.git/**' --glob '!./results/**' --glob '!./logs/**'
+uv run pytest -q tests/integration/test_run_smoke.py::test_cli_report_invalid_run_dir_fails_gracefully tests/integration/test_run_smoke.py::test_cli_dry_run_writes_nothing tests/unit/test_config.py tests/unit/test_scripts.py
+uv run ruff check .
+```
+
+- 结果：通过。占位标记搜索 0 命中；相关 CLI/config/script 测试 32 passed；`ruff` All checks passed。
+- 下一步：后续临时调试 CLI 参数时使用测试或局部日志，避免在 `main()` 中直接打印并读取非所有子命令共有的字段。
+
+## 2026-06-28 - 示例配置运行脚本
+
+- 类型：chore（运行脚本）
+- 摘要：按 `configs/` 下 6 个示例配置新增一一对应的 `scripts/` 运行脚本，并按配置目录结构分类。`scripts/script_config_map.yaml` 保存配置到脚本的映射状态；`ett_small` forecast 脚本归入 `scripts/ett_small/`，`tourism_small` 层级协调脚本归入 `scripts/tourism_small/`；脚本统一从自身位置定位并进入仓库根目录，再调用 `uv run tsforecasting`，透传额外 CLI 参数，不直接依赖 `.venv/bin/tsforecasting`，不设置 `UV_CACHE_DIR`，也不引用 `.uv_cache`。
+- 涉及文件：
+  - `scripts/script_config_map.yaml`
+  - `scripts/ett_small/run_stats.sh`
+  - `scripts/ett_small/run_ml.sh`
+  - `scripts/ett_small/run_neural.sh`
+  - `scripts/ett_small/run_intervals.sh`
+  - `scripts/ett_small/run_intervals_mixed.sh`
+  - `scripts/tourism_small/run_hierarchical.sh`
+  - `tests/unit/test_scripts.py`
+  - `docs/PLAN.md`、`docs/LOG.md`
+- 验证命令：
+
+```bash
+uv run pytest -q tests/unit/test_scripts.py
+uv run python - <<'PY'
+from pathlib import Path
+import subprocess
+import yaml
+mapping = yaml.safe_load(Path("scripts/script_config_map.yaml").read_text())
+for group in mapping["groups"].values():
+    for entry in group["entries"]:
+        subprocess.run([entry["script"], "--dry-run"], check=True)
+PY
+uv run ruff check .
+```
+
+- 结果：通过。脚本契约测试覆盖映射完整性、分类目录和 `uv run` 调用契约；6 个映射脚本 dry-run 均返回 0；`ruff` All checks passed。
+- 下一步：后续新增配置时同步新增对应分类脚本和 `scripts/script_config_map.yaml` 映射项，并保持脚本通过 `uv run tsforecasting` 调用项目 CLI。
+
 ## 2026-06-28 - neat-freak 知识同步收尾
 
 - 类型：docs（知识整理）+ memory

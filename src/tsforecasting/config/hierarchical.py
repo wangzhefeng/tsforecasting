@@ -79,7 +79,9 @@ class HierarchicalConfig:
 
 
 def _build_hierarchical_data(raw: dict) -> HierarchicalDataConfig:
-    """构建层级数据源配置；当前 MVP 只支持 datasetsforecast。"""
+    """
+    构建层级数据源配置；当前 MVP 只支持 datasetsforecast。
+    """
     source = require_str(raw, "source", "data")
     if source not in VALID_HIERARCHICAL_SOURCES:
         raise ConfigError(
@@ -96,7 +98,9 @@ def _build_hierarchical_data(raw: dict) -> HierarchicalDataConfig:
 
 
 def _build_base_models(raw: Any, backend: str) -> list[ModelConfig]:
-    """构建基础预测模型；backend 来自 base_forecast.backend，不在模型项内重复配置。"""
+    """
+    构建基础预测模型；backend 来自 base_forecast.backend，不在模型项内重复配置。
+    """
     if not isinstance(raw, list) or not raw:
         raise ConfigError("base_forecast.models: must be a non-empty list")
     out: list[ModelConfig] = []
@@ -119,6 +123,9 @@ def _build_base_models(raw: Any, backend: str) -> list[ModelConfig]:
 
 
 def _build_base_forecast(raw: dict) -> BaseForecastConfig:
+    """
+    构建层级流程的基础预测配置，并限制基础后端在当前支持集合内。
+    """
     backend = require_str(raw, "backend", "base_forecast")
     if backend not in HIERARCHICAL_BASE_BACKENDS:
         raise ConfigError(
@@ -131,7 +138,9 @@ def _build_base_forecast(raw: dict) -> BaseForecastConfig:
 
 
 def _build_reconcilers(raw: Any) -> list[ReconcilerSpec]:
-    """构建 reconciler spec；class_path 后续由 resolvers 动态实例化。"""
+    """
+    构建 reconciler spec；class_path 后续由 resolvers 动态实例化。
+    """
     if not isinstance(raw, list) or not raw:
         raise ConfigError("hierarchical.reconcilers: must be a non-empty list")
     out: list[ReconcilerSpec] = []
@@ -154,12 +163,18 @@ def _build_reconcilers(raw: Any) -> list[ReconcilerSpec]:
 
 
 def _build_hierarchical_section(raw: dict) -> HierarchicalSectionConfig:
+    """
+    构建协调器列表和诊断开关；diagnostics 未配置时默认开启。
+    """
     reconcilers = _build_reconcilers(require(raw, "reconcilers", "hierarchical"))
     diagnostics = bool(raw.get("diagnostics", True))
     return HierarchicalSectionConfig(reconcilers=reconcilers, diagnostics=diagnostics)
 
 
 def _build_hierarchical_evaluation(raw: dict) -> HierarchicalEvaluationConfig:
+    """
+    构建层级评估配置；当前 MVP 只允许层级流程已实现的指标。
+    """
     metrics = require(raw, "metrics", "evaluation")
     if not isinstance(metrics, list) or not metrics:
         raise ConfigError("evaluation.metrics: must be a non-empty list")
@@ -172,7 +187,9 @@ def _build_hierarchical_evaluation(raw: dict) -> HierarchicalEvaluationConfig:
 
 
 def _build_hierarchical_config(raw: dict) -> HierarchicalConfig:
-    """把层级 YAML 根 mapping 转成 HierarchicalConfig。"""
+    """
+    把层级 YAML 根 mapping 转成 HierarchicalConfig。
+    """
     data = _build_hierarchical_data(require(raw, "data", "config"))
     base_forecast = _build_base_forecast(require(raw, "base_forecast", "config"))
     hierarchical = _build_hierarchical_section(require(raw, "hierarchical", "config"))
@@ -194,7 +211,9 @@ def _build_hierarchical_config(raw: dict) -> HierarchicalConfig:
 
 
 def validate_hierarchical(config: HierarchicalConfig) -> HierarchicalConfig:
-    """执行层级配置跨字段校验；基础类型和必填项已在 build 阶段完成。"""
+    """
+    执行层级配置跨字段校验；基础类型和必填项已在 build 阶段完成。
+    """
     level = config.runtime.log_level.upper()
     if level not in VALID_LOG_LEVELS:
         raise ConfigError(
@@ -208,7 +227,9 @@ def validate_hierarchical(config: HierarchicalConfig) -> HierarchicalConfig:
 
 
 def load_hierarchical_config(path: str | Path) -> HierarchicalConfig:
-    """读取层级 YAML，并返回已经校验过的 HierarchicalConfig。"""
+    """
+    读取层级 YAML，并返回已经校验过的 HierarchicalConfig。
+    """
     p, raw = load_yaml_mapping(path)
     config = _build_hierarchical_config(raw)
     config.config_source = str(p.resolve())
@@ -224,7 +245,9 @@ def resolve_hierarchical_overrides(
     log_name: str | None = None,
     log_level: str | None = None,
 ) -> HierarchicalConfig:
-    """应用 CLI 运行级覆盖；覆盖后再次校验，保证 dry-run 也能提前失败。"""
+    """
+    应用 CLI 运行级覆盖；覆盖后再次校验，保证 dry-run 也能提前失败。
+    """
     return apply_run_overrides(
         config,
         run_id=run_id,

@@ -60,8 +60,9 @@ class PredictConfig:
 
 @dataclass
 class MLForecastConfig:
-    """MLForecast 后端共享的 lag、日期特征和目标变换配置。"""
-
+    """
+    MLForecast 后端共享的 lag、日期特征和目标变换配置。
+    """
     lags: list[int]
     date_features: list[str] | None = None
     target_transforms: list[dict[str, Any]] | None = None
@@ -69,8 +70,9 @@ class MLForecastConfig:
 
 @dataclass
 class PredictionIntervalsConfig:
-    """可选预测区间配置；levels 对应输出列 lo-{level}/hi-{level}。"""
-
+    """
+    可选预测区间配置；levels 对应输出列 lo-{level}/hi-{level}。
+    """
     levels: list[int]
 
 
@@ -294,7 +296,9 @@ def validate(config: Config) -> Config:
 
 
 def load_config(path: str | Path) -> Config:
-    """读取普通 forecast YAML，并返回已经校验过的 Config。"""
+    """
+    读取普通 forecast YAML，并返回已经校验过的 Config。
+    """
     p, raw = load_yaml_mapping(path)
     config = _build_config(raw)
     config.config_source = str(p.resolve())

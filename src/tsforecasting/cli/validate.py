@@ -23,6 +23,7 @@ def cmd_validate_config(args: argparse.Namespace) -> int:
     except ConfigError as exc:
         print(f"config invalid: {exc}", file=sys.stderr)
         return 1
+    
     print(f"config valid: {args.config}")
     print(f"  models: {[m.name for m in config.models]}")
     print(

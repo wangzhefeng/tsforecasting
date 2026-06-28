@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working in this repository.
 
 ## Project Status
 
-`tsforecasting` MVP-0 (StatsForecast vertical slice) and the MVP-1 MLForecast, NeuralForecast, and HierarchicalForecast backends are all implemented. The package lives under `src/tsforecasting/` with a `tsforecasting` CLI (`validate-config` / `run` / `backtest` / `reconcile` / `report`), `pytest` + `ruff` in the dev group, and example configs under `configs/examples/` grouped by dataset: `ett_small/stats.yaml` (StatsForecast), `ett_small/ml.yaml` (mixed StatsForecast + MLForecast), `ett_small/neural.yaml` (mixed StatsForecast + NeuralForecast NHITS CPU smoke, all on hourly `ETTh1`), and `tourism_small/hierarchical.yaml` (TourismSmall hierarchical reconciliation). `run`/`backtest` dispatch one adapter per forecast backend so a single run ranks models across backends; hierarchical reconciliation is an independent `reconcile` flow with its own config and artifacts. NeuralForecast/HierarchicalForecast/notebook-reporting live behind the `[neural]`/`[hierarchical]`/`[report]` extras; see `docs/PLAN.md`.
+`tsforecasting` MVP-0 (StatsForecast vertical slice) and the MVP-1 MLForecast, NeuralForecast, and HierarchicalForecast backends are all implemented. The package lives under `src/tsforecasting/` with a `tsforecasting` CLI (`validate-config` / `run` / `backtest` / `reconcile` / `report`), `pytest` + `ruff` in the dev group, and example configs under `configs/examples/` grouped by dataset: `ett_small/stats.yaml` (StatsForecast), `ett_small/ml.yaml` (mixed StatsForecast + MLForecast), `ett_small/neural.yaml` (mixed StatsForecast + NeuralForecast NHITS CPU smoke, all on hourly `ETTh1`), and `tourism_small/hierarchical.yaml` (TourismSmall hierarchical reconciliation). `run`/`backtest` dispatch one adapter per forecast backend so a single run ranks models across backends; hierarchical reconciliation is an independent `reconcile` flow with its own config and artifacts. NeuralForecast/HierarchicalForecast/HTML reporting live behind the `[neural]`/`[hierarchical]`/`[report]` extras; see `docs/PLAN.md`.
 
 Read these before implementation:
 
@@ -17,9 +17,10 @@ Read these before implementation:
 ## Toolchain
 
 - Python `>=3.12`, managed by `uv`.
-- `uv sync` installs base + the `dev` group (`pytest`, `ruff`); `uv sync --extra <ml|neural|hierarchical|plot|report>` adds an extras group (`report` = nbformat/nbconvert/ipykernel for notebook + HTML reporting).
+- `uv sync` installs base + the `dev` group (`pytest`, `ruff`); base includes `nbformat` for static notebook generation. `uv sync --extra <ml|neural|hierarchical|plot|report>` adds an extras group (`report` = nbconvert/ipykernel for HTML reporting).
 - `uv add <pkg>` / `uv add --dev <pkg>` updates dependencies and `uv.lock`.
 - Dev tooling: `uv run pytest`, `uv run ruff check .`.
+- Curated example scripts live under `scripts/<dataset>/` and call `uv run tsforecasting`; keep `scripts/script_config_map.yaml` in sync with `configs/examples/**`.
 - Dependency pins are load-bearing: Nixtla hard-pins `pandas<3`, and numba (transitive via `statsforecast`) caps `numpy<2.5`. Do not bump these without a spike (see `docs/LOG.md` P1).
 
 ## Current MVP Contract
