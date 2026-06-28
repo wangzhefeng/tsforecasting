@@ -9,6 +9,24 @@
 - 具体计划项状态记录在 `docs/PLAN.md` 的“计划项实现记录”。
 - 日志条目应包含日期、类型、摘要、涉及文件、验证命令、结果和下一步。
 
+## 2026-06-28 - 删除死代码 orchestration/ 包
+
+- 类型:chore(死代码清理)
+- 摘要:neat-freak 分析发现 `src/tsforecasting/orchestration/` 是 P29 重构遗漏清理的死代码包。`forecast_workflow.py`(`run_pipeline` + `_build_adapter`)的编排职责已被 `main.py` 的 `ForecastRunner` 完整复刻并增强(新增 `stage_order`/`skipped_stages` + `ForecastArtifactWriter`);`__init__.py` 仅是 `from main import run_pipeline` 的迁移垫片。两者活跃区 0 引用(grep 确认)、测试已直接用 `tsforecasting.main`。删除整个包,`main.py` 成为唯一编排入口,与 v3「类边界」(不再含 orchestration)对齐,并消除 v1 `Config` 与 v2 `ForecastArgs` 两套并行契约的误用隐患。
+- 涉及文件:
+  - `src/tsforecasting/orchestration/`(删除)
+  - `docs/PLAN.md`
+  - `docs/LOG.md`
+- 验证命令:
+
+```bash
+.venv/bin/ruff check .
+.venv/bin/python -m pytest -q
+```
+
+- 结果:通过。ruff clean;pytest 92 passed / 20 warnings(与删除前一致,无回归);`import tsforecasting.main` 冒烟通过。
+- 下一步:—
+
 ## 2026-06-28 - neat-freak 收尾:验证、清理与 P29 提交
 
 - 类型:docs(知识整理)+ chore
