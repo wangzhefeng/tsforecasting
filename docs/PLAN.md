@@ -1,11 +1,12 @@
 # PLAN.md
 
-本文件是 `tsforecasting` 的可执行开发计划，当前来源于 `docs/unified-ts-framework-plan-v2.md`。后续开发以本文件的计划项为执行入口。
+本文件是 `tsforecasting` 的可执行开发计划，当前来源于 `docs/unified-ts-framework-plan-v3.md`。后续开发以本文件的计划项为执行入口。
 
 ## 维护规则
 
 - `docs/unified-ts-framework-plan-v1.md` 是 v1 历史基线，不直接覆盖。
-- `docs/unified-ts-framework-plan-v2.md` 是当前实施基线，记录优化后的阶段边界、MVP 验收和方案调整。
+- `docs/unified-ts-framework-plan-v3.md` 是当前实施基线，记录 forecast-only runner/CLI/config/artifact 重构后的边界。
+- `docs/unified-ts-framework-plan-v2.md` 是历史实施基线，记录 P1-P28 阶段边界、MVP 验收和方案调整。
 - 架构、范围、MVP 目标或模块边界再次发生变化时，基于最新方案版本生成新的方案文档，例如 `docs/unified-ts-framework-plan-v3.md`，再同步本计划。
 - 每次实施后更新本文件的“计划项实现记录”，记录已完成内容、验证命令、产物路径和下一步。
 - 开发过程日志写入 `docs/LOG.md`，不要把日志混入方案文档。
@@ -25,13 +26,13 @@
 - 统一输出 `predictions.csv`、`backtest_predictions.csv`、`metrics.csv`、`runtime_metrics.csv`、`model_comparison.csv`、`manifest.json`（`metrics.json` 推迟到 MVP-0b）。
 - `manifest.json` 记录配置来源、运行命令、输入数据、字段映射、模型参数、`seed`、`run_id`、日志路径、关键环境变量摘要和 artifact 路径。
 
-### MVP-1：Nixtla 后端扩展与层级验证
+### MVP-1：Nixtla 后端扩展
 
-> 状态：**已达成**（P7 MLForecast、P8 NeuralForecast、P9 TourismSmall hierarchical 全部 done，2026-06-23）。
+> 状态：**forecast 主线已达成**（P7 MLForecast、P8 NeuralForecast done；TourismSmall hierarchical 已归档到 todo，2026-06-28）。
 
 - MLForecast sklearn preset smoke 可运行，并进入统一 metrics / comparison。
 - NeuralForecast `NHITS` 或 `NBEATS` CPU smoke 可运行，训练步数受控。
-- TourismSmall 示例能产出 base forecasts、reconciled forecasts 和 coherence diagnostics。
+- TourismSmall 层级协调历史实现保存在 `src/tsforecasting/todo/hierarchical/`，当前不作为活跃功能。
 
 ### 非 MVP 阻塞项
 
@@ -75,13 +76,14 @@
 | P26 | chore | 示例配置运行脚本 | done | 用户需求：根目录创建 `scripts/`，为 `configs/` 下每个配置写运行脚本，不使用 `.uv_cache`；后续要求脚本按 `configs/` 目录结构保存映射状态并分类，并改用 `uv run tsforecasting` | 新增 `scripts/script_config_map.yaml` 保存配置到脚本的映射状态；脚本按配置目录分类为 `scripts/ett_small/{run_stats,run_ml,run_neural,run_intervals,run_intervals_mixed}.sh` 和 `scripts/tourism_small/run_hierarchical.sh`；所有脚本先定位并进入仓库根目录，再用 `uv run tsforecasting` 调用项目 CLI（forecast=`run`，hierarchical=`reconcile`），透传额外参数，不直接依赖 `.venv/bin/tsforecasting`，不设置 `UV_CACHE_DIR` 或引用 `.uv_cache`；`tests/unit/test_scripts.py` 锁定配置到脚本的一一对应关系、分类目录和 `uv run` 调用契约 | `uv run pytest -q tests/unit/test_scripts.py`；6 个映射脚本 `--dry-run` smoke 通过；`uv run ruff check .` | — | 2026-06-28 |
 | P27 | fix | 手动占位注释清理与 CLI 分发恢复 | done | 用户需求：分析手动修改并解决占位注释项 | 清理 `cli/main.py`、`cli/parser.py`、`config/common.py`、`config/hierarchical.py` 中的占位注释；恢复 `parser.py` 只构建 parser、`main.py` 统一 parse+dispatch 的边界；移除手动调试打印，避免 `validate-config`/`run`/`report` 读取不存在的 argparse 字段；保留用户新增 `utils/log_util.py`，仅按 ruff 修正 import 顺序 | 占位标记搜索 0 命中；`uv run pytest -q tests/integration/test_run_smoke.py::test_cli_report_invalid_run_dir_fails_gracefully tests/integration/test_run_smoke.py::test_cli_dry_run_writes_nothing tests/unit/test_config.py tests/unit/test_scripts.py`（32 passed）；`uv run ruff check .` | — | 2026-06-28 |
 | P28 | docs | neat-freak 知识入口同步 | done | 用户调用 `neat-freak` 整理阶段知识 | 尺寸体检确认 README/AGENTS/CLAUDE/docs 未膨胀；同步 README、AGENTS、CLAUDE：base 依赖包含 `nbformat`，`report` extra 聚焦 HTML 导出，示例脚本位于 `scripts/<dataset>/` 且映射由 `scripts/script_config_map.yaml` 维护；README 状态从 P25 更新到 P28 并补 `intervals.yaml` 示例 | `wc -l AGENTS.md CLAUDE.md README.md docs/*.md`；相对时间 grep 0 命中；`uv run pytest -q tests/unit/test_scripts.py tests/unit/test_config.py`；`uv run ruff check .` | — | 2026-06-28 |
+| P29 | chore | forecast-only 类式运行结构重构 | done | 用户需求：重构算法组织、入口、YAML、结果和 reporting | 新增 `ForecastRunner`/`MainCLI` 类式入口；YAML 改为 v2 backend 分组 schema 并输出 `ForecastArgs`；artifact 改为 run-local `config/ data/ predictions/ metrics/ reports/` 分区；新增 `ForecastArtifactWriter` 和 `ReportGenerator` 类；console script 改为 `tsforecasting.main_cli:main`；scripts 调用 `python -m tsforecasting.main_cli`；hierarchical 全链路迁入 `src/tsforecasting/todo/hierarchical/` 并从活跃 extras、配置、脚本、测试、reporting 移除；新增 v3 方案文档 | `uv run pytest -q tests/unit/test_config.py tests/unit/test_scripts.py tests/unit/test_reporting.py tests/integration/test_run_smoke.py::test_forecast_runner_records_stage_order`（39 passed / 1 skipped）；全量 pytest 92 passed / ruff clean(提交于分支 `chore/forecast-only-restructure`) | — | 2026-06-28 |
 
 ## MVP 开发顺序
 
 1. P1：先补齐工程脚手架、CLI entrypoint、依赖分组、`pytest` 和基础测试目录。
 2. P2-P3：固定 YAML schema、CLI 骨架、canonical data contract 和 artifact schema，并用单元测试锁住。
 3. P4-P6：跑通 StatsForecast MVP-0 纵切面，生成统一 metrics、runtime、comparison 和 manifest。
-4. P7-P9：在 MVP-0 稳定后依次加入 MLForecast、NeuralForecast、TourismSmall 层级验证。
+4. P7-P9：在 MVP-0 稳定后依次加入 MLForecast、NeuralForecast；TourismSmall 层级验证已转为历史归档。
 5. P10：作为 Phase 2 实现 reporting，不作为 MVP 阻塞项。
 6. P11：每个阶段都执行 smoke 验收和文档同步，而不是最后集中补测试。
 

@@ -1,10 +1,7 @@
-# Phase-2 example: prediction intervals across all three backends (levels 80).
-#   - statsforecast: native level= (SeasonalNaive)
-#   - mlforecast:     conformal (fit prediction_intervals) -> predict only
-#   - neuralforecast: NHITS + MQLoss (quantile) -> median point + lo/hi
-# predictions.csv carries lo-80/hi-80 for stats+ml+neural; backtest only for
-# stats+neural (mlforecast conformal does not produce cv intervals).
-# model_comparison adds coverage-80/width-80 columns (display only).
+# Phase-2 example: prediction intervals across all three forecast backends.
+version: 2
+task: forecast
+
 data:
   path: dataset/ett_small/ETTh1.csv
   time_col: date
@@ -12,34 +9,34 @@ data:
   id_col: null
   freq: 1h
 
-backtest:
+split:
   horizon: 24
   n_windows: 3
   step_size: 24
 
 models:
-  - name: seasonal_naive
-    backend: statsforecast
-    params:
-      season_length: 24
-  - name: linear_regression
-    backend: mlforecast
-    params: {}
-  - name: nhits_quantile
-    backend: neuralforecast
-    params:
-      h: 24
-      input_size: 48
-      max_steps: 30
-      enable_progress_bar: false
-      loss:
-        class: neuralforecast.losses.pytorch.MQLoss
-        kwargs:
-          quantiles: [0.1, 0.5, 0.9]
-
-mlforecast:
-  lags: [1, 24]
-  date_features: ["hour"]
+  statsforecast:
+    - name: seasonal_naive
+      params:
+        season_length: 24
+  mlforecast:
+    framework:
+      lags: [1, 24]
+      date_features: ["hour"]
+    models:
+      - name: linear_regression
+        params: {}
+  neuralforecast:
+    - name: nhits_quantile
+      params:
+        h: 24
+        input_size: 48
+        max_steps: 30
+        enable_progress_bar: false
+        loss:
+          class: neuralforecast.losses.pytorch.MQLoss
+          kwargs:
+            quantiles: [0.1, 0.5, 0.9]
 
 prediction_intervals:
   levels: [80]
@@ -48,7 +45,7 @@ evaluation:
   metrics: [mae, rmse, mape, smape]
   rank_metric: mae
 
-predict:
+forecast:
   horizon: 24
 
 runtime:
@@ -56,8 +53,8 @@ runtime:
   log_name: intervals_mixed
   log_level: INFO
 
-artifacts:
-  output_dir: results/intervals_mixed
+output:
+  dir: results/intervals_mixed
   save_plots: false
 
 seed: 0

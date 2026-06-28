@@ -13,9 +13,9 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from tsforecasting.cli import main as cli_main
 from tsforecasting.config import load_config, resolve_overrides
-from tsforecasting.orchestration import run_pipeline
+from tsforecasting.main import ForecastRunner, run_pipeline
+from tsforecasting.main_cli import main as cli_main
 
 EXAMPLE = Path("configs/examples/ett_small/stats.yaml")
 ML_EXAMPLE = Path("configs/examples/ett_small/ml.yaml")
@@ -48,37 +48,63 @@ def test_run_pipeline_smoke(tmp_path: Path) -> None:
 
     assert run_dir == tmp_path / "results" / "smoke-test"
     for name in [
-        "predictions.csv",
-        "backtest_predictions.csv",
-        "metrics.csv",
-        "runtime_metrics.csv",
-        "model_comparison.csv",
+        "predictions/forecast.csv",
+        "predictions/backtest.csv",
+        "metrics/metrics.csv",
+        "metrics/runtime.csv",
+        "metrics/model_comparison.csv",
         "manifest.json",
-        "run_config.yaml",
+        "config/run_config.yaml",
+        "data/summary.json",
     ]:
         assert (run_dir / name).is_file(), name
 
-    metrics = pd.read_csv(run_dir / "metrics.csv")
+    metrics = pd.read_csv(run_dir / "metrics" / "metrics.csv")
     assert set(metrics["metric"]) == {"mae", "rmse", "mape", "smape"}
     assert set(metrics["model"]) == {"seasonal_naive", "auto_ets"}
 
-    comp = pd.read_csv(run_dir / "model_comparison.csv")
+    comp = pd.read_csv(run_dir / "metrics" / "model_comparison.csv")
     assert list(comp["rank"]) == [1, 2]
     assert comp.sort_values("rank").iloc[0]["rank_metric"] == "mae"
     assert {"mae", "rmse", "mape", "smape"} <= set(comp.columns)
 
-    runtime = pd.read_csv(run_dir / "runtime_metrics.csv")
+    runtime = pd.read_csv(run_dir / "metrics" / "runtime.csv")
     assert set(runtime["model_type"]) == {"naive", "ets"}
 
     manifest = json.loads((run_dir / "manifest.json").read_text())
     for key in _MANIFEST_KEYS:
         assert key in manifest, key
     assert manifest["run_id"] == "smoke-test"
-    assert manifest["predict"] == {"horizon": 24}
-    assert "predictions" in manifest["artifacts"]
+    assert manifest["forecast"] == {"horizon": 24}
+    assert manifest["stages"]["test"]["status"] == "skipped"
+    assert manifest["artifacts"]["predictions.forecast"] == "predictions/forecast.csv"
+    assert manifest["artifacts"]["metrics.model_comparison"] == "metrics/model_comparison.csv"
 
-    run_config = (run_dir / "run_config.yaml").read_text()
+    run_config = (run_dir / "config" / "run_config.yaml").read_text()
     assert "smoke-test" in run_config
+
+
+def test_forecast_runner_records_stage_order(tmp_path: Path) -> None:
+    config = load_config(EXAMPLE)
+    resolve_overrides(config, run_id="runner-test", output_dir=str(tmp_path / "results"))
+    runner = ForecastRunner(config, do_predict=False)
+
+    run_dir = runner.run()
+
+    assert run_dir == tmp_path / "results" / "runner-test"
+    assert runner.stage_order == [
+        "parse_args",
+        "load_data",
+        "preprocess",
+        "feature_engineering",
+        "train",
+        "valid",
+        "test",
+        "forecast",
+        "run",
+    ]
+    assert (run_dir / "predictions" / "backtest.csv").is_file()
+    assert not (run_dir / "predictions" / "forecast.csv").exists()
 
 
 def test_cli_run_end_to_end(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -135,18 +161,18 @@ def test_run_pipeline_ml_mixed_smoke(tmp_path: Path) -> None:
     run_dir = run_pipeline(config, do_predict=True)
     assert run_dir == tmp_path / "results" / "ml-smoke-test"
 
-    comp = pd.read_csv(run_dir / "model_comparison.csv")
+    comp = pd.read_csv(run_dir / "metrics" / "model_comparison.csv")
     assert set(comp["backend"]) == {"statsforecast", "mlforecast"}
     assert list(comp["rank"]) == list(range(1, len(comp) + 1))
     assert comp.sort_values("rank").iloc[0]["rank_metric"] == "mae"
 
-    runtime = pd.read_csv(run_dir / "runtime_metrics.csv")
+    runtime = pd.read_csv(run_dir / "metrics" / "runtime.csv")
     assert {"linear", "random_forest", "naive"} <= set(runtime["model_type"])
 
-    metrics = pd.read_csv(run_dir / "metrics.csv")
+    metrics = pd.read_csv(run_dir / "metrics" / "metrics.csv")
     assert set(metrics["backend"]) == {"statsforecast", "mlforecast"}
 
     manifest = json.loads((run_dir / "manifest.json").read_text())
     assert manifest["mlforecast"]["lags"] == [1, 24]
-    assert manifest["predict"] == {"horizon": 24}
+    assert manifest["forecast"] == {"horizon": 24}
     assert set(manifest["per_backend_seed"]) == {"statsforecast", "mlforecast"}

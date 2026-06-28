@@ -9,6 +9,52 @@
 - 具体计划项状态记录在 `docs/PLAN.md` 的“计划项实现记录”。
 - 日志条目应包含日期、类型、摘要、涉及文件、验证命令、结果和下一步。
 
+## 2026-06-28 - neat-freak 收尾:验证、清理与 P29 提交
+
+- 类型:docs(知识整理)+ chore
+- 摘要:对 forecast-only v3 做 neat-freak 全量审查,确认 README/AGENTS/CLAUDE/PLAN/v3/model_catalog/pyproject/configs/scripts/tests/orchestration/记忆 均已对齐 forecast-only v3,无过期或矛盾,规则文档相对时间清零。改动:CLAUDE/AGENTS 去掉 `currently` 时态词(三-backend 为 v3 固化架构,非临时);修复 nixtla `__init__` import 排序(I001,改字母序 ml/neural/stats);清理活跃区与 tests 指向已迁走 hierarchical/reconciliation 模块的 8 个孤儿 `.pyc`。全量验证 ruff clean + pytest 92 passed,将 P29 重构(59 files)提交至分支 `chore/forecast-only-restructure`。精简 `[report]` extra 冗余 `nbformat` 因 pypi 网络不可达(`uv lock` 失败)暂缓并回退 pyproject。
+- 涉及文件:
+  - `CLAUDE.md`
+  - `AGENTS.md`
+  - `src/tsforecasting/models/nixtla/__init__.py`
+  - `docs/PLAN.md`
+  - `docs/LOG.md`
+- 验证命令:
+
+```bash
+.venv/bin/ruff check .
+.venv/bin/python -m pytest -q
+```
+
+- 结果:通过。ruff All checks passed;pytest 92 passed / 20 warnings(均为 pytorch_lightning 上游弃用提示)。
+- 下一步:将 `chore/forecast-only-restructure` fast-forward merge 回 main;网络恢复后再做 `[report]` extra 精简(`uv lock`)。
+
+## 2026-06-28 - forecast-only 类式运行结构重构
+
+- 类型：chore（架构重构 / 入口重构）
+- 摘要：按用户方案将主线收敛到 StatsForecast、MLForecast、NeuralForecast 三类 forecast backend。新增 `ForecastRunner` 和 `MainCLI` 类式入口；YAML 改为 backend 分组 v2 schema 并输出 `ForecastArgs`；artifact 改为 run-local `config/ data/ predictions/ metrics/ reports/` 分区；新增 `ForecastArtifactWriter` 与 `ReportGenerator` 类；脚本改用 `uv run python -m tsforecasting.main_cli`；TourismSmall 层级协调全链路迁入 `src/tsforecasting/todo/hierarchical/`，从活跃入口、extras、配置、脚本、测试和 reporting 移除。
+- 涉及文件：
+  - `src/tsforecasting/main.py`
+  - `src/tsforecasting/main_cli.py`
+  - `src/tsforecasting/config/forecast.py`
+  - `src/tsforecasting/artifacts/`
+  - `src/tsforecasting/reporting/`
+  - `configs/examples/ett_small/*.yaml`
+  - `scripts/`
+  - `src/tsforecasting/todo/hierarchical/`
+  - `README.md`
+  - `AGENTS.md`
+  - `docs/PLAN.md`
+  - `docs/unified-ts-framework-plan-v3.md`
+- 验证命令：
+
+```bash
+uv run pytest -q tests/unit/test_config.py tests/unit/test_scripts.py tests/unit/test_reporting.py tests/integration/test_run_smoke.py::test_forecast_runner_records_stage_order
+```
+
+- 结果：通过，39 passed / 1 skipped。全量验证记录见本轮最终执行结果。
+- 下一步：若后续恢复层级协调，先从 `todo/hierarchical/` 重新设计为独立 feature，不直接接回当前 forecast 主线。
+
 ## 2026-06-28 - neat-freak 知识入口同步
 
 - 类型：docs（知识整理）+ memory

@@ -123,7 +123,10 @@ def apply_run_overrides(
     elif config.run_id is None:
         config.run_id = generate_run_id()
     if output_dir is not None:
-        config.artifacts.output_dir = output_dir
+        if hasattr(config, "output"):
+            config.output.dir = output_dir
+        if hasattr(config, "artifacts"):
+            config.artifacts.output_dir = output_dir
     if log_name is not None:
         config.runtime.log_name = log_name
     if log_level is not None:

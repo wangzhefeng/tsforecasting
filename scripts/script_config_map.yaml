@@ -26,11 +26,3 @@ groups:
         command: run
         config: configs/examples/ett_small/intervals_mixed.yaml
         script: scripts/ett_small/run_intervals_mixed.sh
-  tourism_small:
-    config_dir: configs/examples/tourism_small
-    scripts_dir: scripts/tourism_small
-    entries:
-      - name: hierarchical
-        command: reconcile
-        config: configs/examples/tourism_small/hierarchical.yaml
-        script: scripts/tourism_small/run_hierarchical.sh

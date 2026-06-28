@@ -8,13 +8,15 @@ from pathlib import Path
 import pytest
 import yaml
 
-from tsforecasting.cli import main as cli_main
 from tsforecasting.config import (
     ConfigError,
+    ForecastArgs,
     generate_run_id,
     load_config,
     resolve_overrides,
 )
+from tsforecasting.main_cli import MainCLI
+from tsforecasting.main_cli import main as cli_main
 
 EXAMPLE = Path("configs/examples/ett_small/stats.yaml")
 
@@ -23,20 +25,24 @@ _RUN_ID_RE = re.compile(r"^tsforecasting-\d{8}\d{6}-[0-9a-f]{8}$")
 
 def _base() -> dict:
     return {
+        "version": 2,
+        "task": "forecast",
         "data": {
             "path": "dataset/ett_small/ETTh1.csv",
             "time_col": "date",
             "target_col": "OT",
             "freq": "1h",
         },
-        "backtest": {"horizon": 24, "n_windows": 3, "step_size": 24},
-        "models": [
-            {"name": "seasonal_naive", "backend": "statsforecast", "params": {"season_length": 24}},
-            {"name": "auto_ets", "backend": "statsforecast", "params": {"season_length": 24}},
-        ],
+        "split": {"horizon": 24, "n_windows": 3, "step_size": 24},
+        "models": {
+            "statsforecast": [
+                {"name": "seasonal_naive", "params": {"season_length": 24}},
+                {"name": "auto_ets", "params": {"season_length": 24}},
+            ]
+        },
         "evaluation": {"metrics": ["mae", "rmse", "mape", "smape"], "rank_metric": "mae"},
         "runtime": {"collect_timing": True, "log_name": "ett_small_mvp0", "log_level": "INFO"},
-        "artifacts": {"output_dir": "results/ett_small_stats", "save_plots": False},
+        "output": {"dir": "results/ett_small_stats", "save_plots": False},
         "seed": 0,
     }
 
@@ -49,13 +55,22 @@ def _write(tmp_path: Path, data: dict) -> Path:
 
 def test_example_config_loads_and_validates() -> None:
     config = load_config(EXAMPLE)
+    assert isinstance(config, ForecastArgs)
     assert [m.name for m in config.models] == ["seasonal_naive", "auto_ets"]
+    assert [m.backend for m in config.models] == ["statsforecast", "statsforecast"]
     assert config.data.freq == "1h"
     assert config.data.id_col is None
     assert config.evaluation.rank_metric == "mae"
-    assert config.predict is not None and config.predict.horizon == 24
+    assert config.forecast is not None and config.forecast.horizon == 24
     assert config.seed == 0
     assert config.config_source is not None
+
+
+def test_unknown_top_level_key_raises(tmp_path: Path) -> None:
+    data = _base()
+    data["backtest"] = {"horizon": 24, "n_windows": 3, "step_size": 24}
+    with pytest.raises(ConfigError, match="unknown top-level"):
+        load_config(_write(tmp_path, data))
 
 
 def test_missing_data_path_raises(tmp_path: Path) -> None:
@@ -67,52 +82,53 @@ def test_missing_data_path_raises(tmp_path: Path) -> None:
 
 def test_empty_models_raises(tmp_path: Path) -> None:
     data = _base()
-    data["models"] = []
+    data["models"] = {"statsforecast": []}
     with pytest.raises(ConfigError, match="models"):
         load_config(_write(tmp_path, data))
 
 
 def test_duplicate_model_names_raise(tmp_path: Path) -> None:
     data = _base()
-    data["models"][1]["name"] = "seasonal_naive"
+    data["models"]["statsforecast"][1]["name"] = "seasonal_naive"
     with pytest.raises(ConfigError, match="unique"):
         load_config(_write(tmp_path, data))
 
 
 def test_unsupported_backend_raises(tmp_path: Path) -> None:
     data = _base()
-    data["models"][0]["backend"] = "xgboost"
+    data["models"]["xgboost"] = [{"name": "seasonal_naive", "params": {}}]
     with pytest.raises(ConfigError, match="backend"):
         load_config(_write(tmp_path, data))
 
 
 def test_unknown_model_name_raises(tmp_path: Path) -> None:
     data = _base()
-    data["models"][0]["name"] = "does_not_exist"
+    data["models"]["statsforecast"][0]["name"] = "does_not_exist"
     with pytest.raises(ConfigError, match="not in registry"):
         load_config(_write(tmp_path, data))
 
 
 def test_model_backend_mismatch_raises(tmp_path: Path) -> None:
     data = _base()
-    data["models"][0]["name"] = "linear_regression"
-    data["models"][0]["backend"] = "statsforecast"
+    data["models"]["statsforecast"][0]["name"] = "linear_regression"
     with pytest.raises(ConfigError, match="registry backend"):
         load_config(_write(tmp_path, data))
 
 
 def test_mlforecast_backend_requires_section(tmp_path: Path) -> None:
     data = _base()
-    data["models"].append({"name": "linear_regression", "backend": "mlforecast", "params": {}})
-    # mlforecast model but no top-level mlforecast section -> error
+    data["models"]["mlforecast"] = {"models": [{"name": "linear_regression", "params": {}}]}
+    # mlforecast model but no framework section -> error
     with pytest.raises(ConfigError, match="mlforecast"):
         load_config(_write(tmp_path, data))
 
 
 def test_mlforecast_section_loads(tmp_path: Path) -> None:
     data = _base()
-    data["models"].append({"name": "linear_regression", "backend": "mlforecast", "params": {}})
-    data["mlforecast"] = {"lags": [1, 24], "date_features": ["hour"]}
+    data["models"]["mlforecast"] = {
+        "framework": {"lags": [1, 24], "date_features": ["hour"]},
+        "models": [{"name": "linear_regression", "params": {}}],
+    }
     config = load_config(_write(tmp_path, data))
     assert config.mlforecast is not None
     assert config.mlforecast.lags == [1, 24]
@@ -121,34 +137,34 @@ def test_mlforecast_section_loads(tmp_path: Path) -> None:
 
 def test_mlforecast_empty_lags_raises(tmp_path: Path) -> None:
     data = _base()
-    data["models"].append({"name": "linear_regression", "backend": "mlforecast", "params": {}})
-    data["mlforecast"] = {"lags": []}
+    data["models"]["mlforecast"] = {
+        "framework": {"lags": []},
+        "models": [{"name": "linear_regression", "params": {}}],
+    }
     with pytest.raises(ConfigError, match="lags"):
         load_config(_write(tmp_path, data))
 
 
 def test_mlforecast_bad_target_transforms_raises(tmp_path: Path) -> None:
     data = _base()
-    data["models"].append({"name": "linear_regression", "backend": "mlforecast", "params": {}})
-    data["mlforecast"] = {"lags": [1], "target_transforms": [{"args": [1]}]}  # missing 'class'
+    data["models"]["mlforecast"] = {
+        "framework": {"lags": [1], "target_transforms": [{"args": [1]}]},
+        "models": [{"name": "linear_regression", "params": {}}],
+    }
     with pytest.raises(ConfigError, match="target_transforms"):
         load_config(_write(tmp_path, data))
 
 
 def test_neuralforecast_backend_loads_without_top_level_section(tmp_path: Path) -> None:
-    # Unlike mlforecast, neuralforecast carries its hyperparams per-model, so no
-    # top-level section is required.
+    # Unlike mlforecast, neuralforecast carries its hyperparams per-model.
     data = _base()
-    data["models"].append(
-        {
-            "name": "nhits",
-            "backend": "neuralforecast",
-            "params": {"h": 24, "input_size": 48, "max_steps": 5},
-        }
-    )
+    data["models"]["neuralforecast"] = [
+        {"name": "nhits", "params": {"h": 24, "input_size": 48, "max_steps": 5}}
+    ]
     config = load_config(_write(tmp_path, data))
-    assert config.models[-1].backend == "neuralforecast"
-    assert config.models[-1].params["h"] == 24
+    neural = [m for m in config.models if m.backend == "neuralforecast"]
+    assert neural[0].name == "nhits"
+    assert neural[0].params["h"] == 24
 
 
 def test_prediction_intervals_loads(tmp_path: Path) -> None:
@@ -182,7 +198,7 @@ def test_rank_metric_not_in_metrics_raises(tmp_path: Path) -> None:
 
 def test_non_positive_backtest_horizon_raises(tmp_path: Path) -> None:
     data = _base()
-    data["backtest"]["horizon"] = 0
+    data["split"]["horizon"] = 0
     with pytest.raises(ConfigError, match="horizon"):
         load_config(_write(tmp_path, data))
 
@@ -213,6 +229,7 @@ def test_resolve_overrides_applies_cli_values(tmp_path: Path) -> None:
         log_level="debug",
     )
     assert config.run_id == "custom-run"
+    assert config.output.dir == "results/x"
     assert config.artifacts.output_dir == "results/x"
     assert config.runtime.log_name == "ln"
     assert config.runtime.log_level == "DEBUG"
@@ -237,11 +254,17 @@ def test_cli_validate_config_valid_example(capsys: pytest.CaptureFixture[str]) -
     assert "seasonal_naive" in out
 
 
+def test_main_cli_class_entrypoint(capsys: pytest.CaptureFixture[str]) -> None:
+    cli = MainCLI(["validate-config", "--config", str(EXAMPLE)])
+    assert cli.run() == 0
+    assert "config valid" in capsys.readouterr().out
+
+
 def test_cli_validate_config_invalid_returns_nonzero(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     data = _base()
-    data["models"][0]["backend"] = "xgboost"
+    data["models"]["xgboost"] = [{"name": "seasonal_naive", "params": {}}]
     path = _write(tmp_path, data)
     assert cli_main(["validate-config", "--config", str(path)]) == 1
     err = capsys.readouterr().err
@@ -252,7 +275,7 @@ def test_cli_validate_config_unknown_model_returns_nonzero(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     data = _base()
-    data["models"][0]["name"] = "does_not_exist"
+    data["models"]["statsforecast"][0]["name"] = "does_not_exist"
     path = _write(tmp_path, data)
     assert cli_main(["validate-config", "--config", str(path)]) == 1
     err = capsys.readouterr().err

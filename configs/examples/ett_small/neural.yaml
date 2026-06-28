@@ -1,47 +1,47 @@
-# MVP-1 example: mixed StatsForecast baseline + NeuralForecast NHITS CPU smoke
-# on hourly ETTh1. freq 1h / input_size 48 spans two daily cycles (period 24).
-# Both backends flow into one ranked model_comparison.csv. ``max_steps`` is kept
-# tiny for a fast CPU/MPS smoke; raise it for real training.
+# MVP-1 example: mixed StatsForecast baseline + NeuralForecast NHITS CPU smoke.
+version: 2
+task: forecast
+
 data:
   path: dataset/ett_small/ETTh1.csv
   time_col: date
   target_col: OT
-  id_col: null            # single series -> unique_id = "series_0"
+  id_col: null
   freq: 1h
 
-backtest:
+split:
   horizon: 24
   n_windows: 3
   step_size: 24
 
 models:
-  - name: seasonal_naive
-    backend: statsforecast
-    params:
-      season_length: 24
-  - name: nhits
-    backend: neuralforecast
-    params:
-      h: 24
-      input_size: 48
-      max_steps: 50
-      enable_progress_bar: false
-      random_seed: 0
+  statsforecast:
+    - name: seasonal_naive
+      params:
+        season_length: 24
+  neuralforecast:
+    - name: nhits
+      params:
+        h: 24
+        input_size: 48
+        max_steps: 50
+        enable_progress_bar: false
+        random_seed: 0
 
 evaluation:
   metrics: [mae, rmse, mape, smape]
   rank_metric: mae
 
-predict:
-  horizon: 24             # when present, `run` also emits predictions.csv
+forecast:
+  horizon: 24
 
 runtime:
   collect_timing: true
   log_name: ett_small_neural
   log_level: INFO
 
-artifacts:
-  output_dir: results/ett_small_neural
+output:
+  dir: results/ett_small_neural
   save_plots: false
 
 seed: 0

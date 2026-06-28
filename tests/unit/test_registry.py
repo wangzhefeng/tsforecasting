@@ -5,12 +5,12 @@ from __future__ import annotations
 import pytest
 
 from tsforecasting.config import (
-    ArtifactsConfig,
     BacktestConfig,
     Config,
     DataConfig,
     EvaluationConfig,
     ModelConfig,
+    OutputConfig,
     RuntimeConfig,
 )
 from tsforecasting.models import (
@@ -26,11 +26,11 @@ from tsforecasting.models import (
 def _config(models: list[ModelConfig]) -> Config:
     return Config(
         data=DataConfig(path="x", time_col="date", target_col="OT", freq="1h"),
-        backtest=BacktestConfig(horizon=24, n_windows=3, step_size=24),
+        split=BacktestConfig(horizon=24, n_windows=3, step_size=24),
         models=models,
         evaluation=EvaluationConfig(metrics=["mae"]),
         runtime=RuntimeConfig(),
-        artifacts=ArtifactsConfig(output_dir="results/x"),
+        output=OutputConfig(dir="results/x"),
     )
 
 

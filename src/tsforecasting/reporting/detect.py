@@ -21,15 +21,12 @@ def read_run_id(run_dir: Path) -> str:
 
 
 def detect_run_type(run_dir: str | Path) -> str:
-    """根据 artifact 文件判断运行类型：普通 forecast 或层级协调。"""
+    """根据 artifact 文件判断是否为普通 forecast run。"""
     run_dir = Path(run_dir)
     if not run_dir.is_dir():
         raise ValueError(f"run_dir not found: {run_dir}")
-    if (run_dir / "model_comparison.csv").exists():
-        return "mvp0"
-    if (run_dir / "reconciliation_diagnostics.csv").exists():
-        return "hierarchical"
+    if (run_dir / "metrics" / "model_comparison.csv").exists():
+        return "forecast"
     raise ValueError(
-        f"run_dir has neither model_comparison.csv nor "
-        f"reconciliation_diagnostics.csv: {run_dir}"
+        f"run_dir is not a forecast run with metrics/model_comparison.csv: {run_dir}"
     )

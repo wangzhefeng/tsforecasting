@@ -16,12 +16,11 @@ dependencies = [
 [project.optional-dependencies]
 ml = ["mlforecast", "scikit-learn"]
 neural = ["neuralforecast"]
-hierarchical = ["hierarchicalforecast", "datasetsforecast"]
 plot = ["matplotlib"]
 report = ["nbformat", "nbconvert", "ipykernel"]
 
 [project.scripts]
-tsforecasting = "tsforecasting.cli:main"
+tsforecasting = "tsforecasting.main_cli:main"
 
 [dependency-groups]
 dev = ["pytest", "ruff"]
@@ -36,6 +35,7 @@ packages = ["src/tsforecasting"]
 [tool.ruff]
 target-version = "py312"
 line-length = 88
+extend-exclude = ["src/tsforecasting/todo"]
 
 [tool.ruff.lint]
 select = ["F", "I"]

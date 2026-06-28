@@ -29,6 +29,7 @@ def test_every_example_config_is_mapped_to_one_classified_script() -> None:
     scripted_configs = sorted(entry["config"] for entry in _entries())
 
     assert scripted_configs == config_paths
+    assert all("tourism_small" not in config for config in scripted_configs)
 
 
 def test_script_map_classifies_by_config_directory() -> None:
@@ -49,10 +50,14 @@ def test_scripts_use_uv_run_cli_without_uv_cache() -> None:
         text = script.read_text()
 
         assert 'cd "$ROOT_DIR"' in text
-        assert "exec uv run tsforecasting" in text
+        assert "exec uv run python -m tsforecasting.main_cli" in text
         assert ".venv/bin/tsforecasting" not in text
         assert ".uv_cache" not in text
         assert "UV_CACHE_DIR" not in text
         assert f'"{entry["command"]}"' in text
         assert entry["config"] in text
         assert '"$@"' in text
+
+
+def test_script_map_contains_only_forecast_commands() -> None:
+    assert {entry["command"] for entry in _entries()} == {"run"}
