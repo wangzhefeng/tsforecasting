@@ -1,4 +1,4 @@
-"""Config validation CLI command."""
+"""validate-config CLI 子命令实现。"""
 
 from __future__ import annotations
 

@@ -1,30 +1,27 @@
-"""YAML configuration schema, validation, and run-id / override resolution.
-
-MVP-0 uses a single YAML file (no Python config, no multi-file merge) plus a
-small allow-list of run-level CLI overrides. Validation is stdlib-only
-(dataclasses + explicit checks); no pydantic, to keep the base dependency
-surface at the Nixtla pair + pyyaml.
-"""
+"""普通预测流程的 YAML 配置类型、构建、校验与 CLI override 解析。"""
 
 from __future__ import annotations
 
-import secrets
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import yaml
+from tsforecasting.config.common import (
+    VALID_LOG_LEVELS,
+    ArtifactsConfig,
+    ConfigError,
+    RuntimeConfig,
+    apply_run_overrides,
+    build_artifacts,
+    build_runtime,
+    load_yaml_mapping,
+    require,
+    require_pos_int,
+    require_str,
+)
 
 SUPPORTED_BACKENDS = frozenset({"statsforecast", "mlforecast", "neuralforecast"})
 CORE_METRICS = frozenset({"mae", "rmse", "mape", "smape"})
-VALID_LOG_LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
-
-
-class ConfigError(ValueError):
-    """
-    Raised when a config file fails schema validation.
-    """
 
 
 @dataclass
@@ -63,13 +60,7 @@ class PredictConfig:
 
 @dataclass
 class MLForecastConfig:
-    """MLForecast 后端共享的特征与变换参数。
-
-    MLForecast 会把同一后端下的多个内部模型包装到一个框架对象中，
-    因此 lags、日期特征和目标变换属于后端级配置，而不是单个模型配置。
-    ``target_transforms`` 使用可序列化描述（``{class, args?, kwargs?}``），
-    由 adapter 在运行时解析，确保 ``run_config.yaml`` 仍然是安全的 YAML。
-    """
+    """MLForecast 后端共享的 lag、日期特征和目标变换配置。"""
 
     lags: list[int]
     date_features: list[str] | None = None
@@ -78,26 +69,9 @@ class MLForecastConfig:
 
 @dataclass
 class PredictionIntervalsConfig:
-    """可选预测区间配置。
-
-    设置后，支持的后端会在预测和回测结果中追加 ``lo-{level}`` /
-    ``hi-{level}`` 列，评估阶段也会按区间层级计算 coverage 和 width。
-    """
+    """可选预测区间配置；levels 对应输出列 lo-{level}/hi-{level}。"""
 
     levels: list[int]
-
-
-@dataclass
-class RuntimeConfig:
-    collect_timing: bool = True
-    log_name: str = "main"
-    log_level: str = "INFO"
-
-
-@dataclass
-class ArtifactsConfig:
-    output_dir: str
-    save_plots: bool = False
 
 
 @dataclass
@@ -112,35 +86,16 @@ class Config:
     seed: int = 0
     mlforecast: MLForecastConfig | None = None
     prediction_intervals: PredictionIntervalsConfig | None = None
-    # resolved at run time:
+    # 运行时解析：来自 CLI override 或默认 run_id 生成。
     run_id: str | None = None
     config_source: str | None = None
 
 
-def _require(mapping: dict, key: str, ctx: str) -> Any:
-    if key not in mapping:
-        raise ConfigError(f"{ctx}: missing required key '{key}'")
-    return mapping[key]
-
-
-def _require_str(mapping: dict, key: str, ctx: str) -> str:
-    val = _require(mapping, key, ctx)
-    if not isinstance(val, str) or not val.strip():
-        raise ConfigError(f"{ctx}: '{key}' must be a non-empty string")
-    return val
-
-
-def _require_pos_int(mapping: dict, key: str, ctx: str) -> int:
-    val = _require(mapping, key, ctx)
-    if not isinstance(val, int) or isinstance(val, bool) or val <= 0:
-        raise ConfigError(f"{ctx}: '{key}' must be a positive integer")
-    return val
-
-
 def _build_data(raw: dict) -> DataConfig:
-    path = _require_str(raw, "path", "data")
-    time_col = _require_str(raw, "time_col", "data")
-    target_col = _require_str(raw, "target_col", "data")
+    """构建 data section；这里只校验字段类型，不读取真实数据文件。"""
+    path = require_str(raw, "path", "data")
+    time_col = require_str(raw, "time_col", "data")
+    target_col = require_str(raw, "target_col", "data")
     id_col = raw.get("id_col")
     if id_col is not None and not isinstance(id_col, str):
         raise ConfigError("data: 'id_col' must be a string or null")
@@ -153,14 +108,15 @@ def _build_data(raw: dict) -> DataConfig:
 
 
 def _build_models(raw: Any) -> list[ModelConfig]:
+    """构建模型列表；模型名和 backend 是否注册在 validate() 阶段校验。"""
     if not isinstance(raw, list) or not raw:
         raise ConfigError("models: must be a non-empty list")
     out: list[ModelConfig] = []
     for i, m in enumerate(raw):
         if not isinstance(m, dict):
             raise ConfigError(f"models[{i}]: must be a mapping")
-        name = _require_str(m, "name", f"models[{i}]")
-        backend = _require_str(m, "backend", f"models[{i}]")
+        name = require_str(m, "name", f"models[{i}]")
+        backend = require_str(m, "backend", f"models[{i}]")
         params = m.get("params", {})
         if params is None:
             params = {}
@@ -171,29 +127,15 @@ def _build_models(raw: Any) -> list[ModelConfig]:
 
 
 def _build_evaluation(raw: dict) -> EvaluationConfig:
-    metrics = _require(raw, "metrics", "evaluation")
+    metrics = require(raw, "metrics", "evaluation")
     if not isinstance(metrics, list) or not metrics:
         raise ConfigError("evaluation.metrics: must be a non-empty list")
     return EvaluationConfig(metrics=list(metrics), rank_metric=raw.get("rank_metric", "mae"))
 
 
-def _build_runtime(raw: dict) -> RuntimeConfig:
-    return RuntimeConfig(
-        collect_timing=bool(raw.get("collect_timing", True)),
-        log_name=raw.get("log_name", "main"),
-        log_level=raw.get("log_level", "INFO"),
-    )
-
-
-def _build_artifacts(raw: dict) -> ArtifactsConfig:
-    return ArtifactsConfig(
-        output_dir=_require_str(raw, "output_dir", "artifacts"),
-        save_plots=bool(raw.get("save_plots", False)),
-    )
-
-
 def _build_mlforecast(raw: dict) -> MLForecastConfig:
-    lags = _require(raw, "lags", "mlforecast")
+    """构建 MLForecast 共享配置，保持 target_transforms 为 YAML 可序列化 spec。"""
+    lags = require(raw, "lags", "mlforecast")
     if not isinstance(lags, list) or not lags or not all(
         isinstance(x, int) and not isinstance(x, bool) for x in lags
     ):
@@ -209,15 +151,21 @@ def _build_mlforecast(raw: dict) -> MLForecastConfig:
         if not isinstance(target_transforms, list):
             raise ConfigError("mlforecast.target_transforms: must be a list or null")
         for i, spec in enumerate(target_transforms):
-            if not isinstance(spec, dict) or not isinstance(spec.get("class"), str) or not spec["class"].strip():
+            if (
+                not isinstance(spec, dict)
+                or not isinstance(spec.get("class"), str)
+                or not spec["class"].strip()
+            ):
                 raise ConfigError(
-                    f"mlforecast.target_transforms[{i}]: must be a mapping with a string 'class'"
+                    f"mlforecast.target_transforms[{i}]: must be a mapping "
+                    "with a string 'class'"
                 )
             for k in ("args", "kwargs"):
                 v = spec.get(k)
                 if v is not None and not isinstance(v, (list, dict)):
                     raise ConfigError(
-                        f"mlforecast.target_transforms[{i}].{k}: must be a list/dict or null"
+                        f"mlforecast.target_transforms[{i}].{k}: "
+                        "must be a list/dict or null"
                     )
     return MLForecastConfig(
         lags=list(lags),
@@ -227,35 +175,40 @@ def _build_mlforecast(raw: dict) -> MLForecastConfig:
 
 
 def _build_prediction_intervals(raw: dict) -> PredictionIntervalsConfig:
-    levels = _require(raw, "levels", "prediction_intervals")
+    levels = require(raw, "levels", "prediction_intervals")
     if (
         not isinstance(levels, list)
         or not levels
         or not all(
-            isinstance(x, int) and not isinstance(x, bool) and 0 < x < 100 for x in levels
+            isinstance(x, int) and not isinstance(x, bool) and 0 < x < 100
+            for x in levels
         )
     ):
         raise ConfigError(
-            "prediction_intervals.levels: must be a non-empty list of integers in (0, 100)"
+            "prediction_intervals.levels: must be a non-empty list of integers "
+            "in (0, 100)"
         )
     return PredictionIntervalsConfig(levels=list(levels))
 
 
 def _build_config(raw: dict) -> Config:
-    data = _build_data(_require(raw, "data", "config"))
-    bt_raw = _require(raw, "backtest", "config")
+    """把 YAML 根 mapping 转成 Config；跨 section 约束交给 validate()。"""
+    data = _build_data(require(raw, "data", "config"))
+    bt_raw = require(raw, "backtest", "config")
     backtest = BacktestConfig(
-        horizon=_require_pos_int(bt_raw, "horizon", "backtest"),
-        n_windows=_require_pos_int(bt_raw, "n_windows", "backtest"),
-        step_size=_require_pos_int(bt_raw, "step_size", "backtest"),
+        horizon=require_pos_int(bt_raw, "horizon", "backtest"),
+        n_windows=require_pos_int(bt_raw, "n_windows", "backtest"),
+        step_size=require_pos_int(bt_raw, "step_size", "backtest"),
     )
-    models = _build_models(_require(raw, "models", "config"))
-    evaluation = _build_evaluation(_require(raw, "evaluation", "config"))
-    runtime = _build_runtime(raw.get("runtime") or {})
-    artifacts = _build_artifacts(_require(raw, "artifacts", "config"))
+    models = _build_models(require(raw, "models", "config"))
+    evaluation = _build_evaluation(require(raw, "evaluation", "config"))
+    runtime = build_runtime(raw.get("runtime") or {})
+    artifacts = build_artifacts(require(raw, "artifacts", "config"))
     predict = None
     if raw.get("predict"):
-        predict = PredictConfig(horizon=_require_pos_int(raw["predict"], "horizon", "predict"))
+        predict = PredictConfig(
+            horizon=require_pos_int(raw["predict"], "horizon", "predict")
+        )
     mlforecast = None
     if raw.get("mlforecast"):
         mlforecast = _build_mlforecast(raw["mlforecast"])
@@ -280,7 +233,7 @@ def _build_config(raw: dict) -> Config:
 
 
 def validate(config: Config) -> Config:
-    """Run cross-field validation. Type/required-key checks happen at build time."""
+    """执行跨字段校验；必填项和基础类型校验已在 build 阶段完成。"""
     from tsforecasting.models.registry import RegistryError, get_entry
 
     names = [m.name for m in config.models]
@@ -294,6 +247,7 @@ def validate(config: Config) -> Config:
                 f"(supported: {sorted(SUPPORTED_BACKENDS)})"
             )
         try:
+            # 只读取 registry 元数据，不 import 可选 backend，也不实例化模型。
             entry = get_entry(m.name)
         except RegistryError as exc:
             raise ConfigError(str(exc)) from exc
@@ -306,8 +260,8 @@ def validate(config: Config) -> Config:
     if any(m.backend == "mlforecast" for m in config.models):
         if config.mlforecast is None:
             raise ConfigError(
-                "models use backend 'mlforecast' but no top-level 'mlforecast' section "
-                "(with non-empty 'lags') is configured"
+                "models use backend 'mlforecast' but no top-level 'mlforecast' "
+                "section (with non-empty 'lags') is configured"
             )
 
     bad_metrics = [m for m in config.evaluation.metrics if m not in CORE_METRICS]
@@ -340,31 +294,11 @@ def validate(config: Config) -> Config:
 
 
 def load_config(path: str | Path) -> Config:
-    """
-    Load and validate a YAML config file.
-    """
-    # 配置文件路径
-    p = Path(path)
-    if not p.is_file():
-        raise ConfigError(f"config file not found: {path}")
-    # 读取配置文件
-    raw = yaml.safe_load(p.read_text(encoding="utf-8"))
-    if not isinstance(raw, dict):
-        raise ConfigError("config root must be a mapping")
-    # 根据配置文件生成配置
+    """读取普通 forecast YAML，并返回已经校验过的 Config。"""
+    p, raw = load_yaml_mapping(path)
     config = _build_config(raw)
-    # 记录配置文件路径
     config.config_source = str(p.resolve())
-    # 校验配置
-    validate(config)
-
-    return config
-
-
-def generate_run_id() -> str:
-    """``tsforecasting-<UTC timestamp YYYYmmddHHMMSS>-<random8>`` (sortable)."""
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-    return f"tsforecasting-{ts}-{secrets.token_hex(4)}"
+    return validate(config)
 
 
 def resolve_overrides(
@@ -375,15 +309,12 @@ def resolve_overrides(
     log_name: str | None = None,
     log_level: str | None = None,
 ) -> Config:
-    """Apply run-level CLI overrides in place, defaulting run_id if unset."""
-    if run_id is not None:
-        config.run_id = run_id
-    elif config.run_id is None:
-        config.run_id = generate_run_id()
-    if output_dir is not None:
-        config.artifacts.output_dir = output_dir
-    if log_name is not None:
-        config.runtime.log_name = log_name
-    if log_level is not None:
-        config.runtime.log_level = log_level.upper()
-    return validate(config)
+    """应用 CLI 运行级覆盖；覆盖后再次 validate，避免绕过配置校验。"""
+    return apply_run_overrides(
+        config,
+        run_id=run_id,
+        output_dir=output_dir,
+        log_name=log_name,
+        log_level=log_level,
+        validate=validate,
+    )

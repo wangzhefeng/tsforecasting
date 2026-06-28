@@ -1,9 +1,7 @@
-"""Artifact writer: persist CSVs, manifest.json, and run_config.yaml."""
+"""Artifact 写入器：统一落盘 CSV、manifest.json 和 run_config.yaml。"""
 
 from __future__ import annotations
 
-import dataclasses
-import json
 import os
 import platform
 import sys
@@ -12,12 +10,12 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-import yaml
 
 from tsforecasting.artifacts.schema import validate_columns
 from tsforecasting.config import Config
 from tsforecasting.config.hierarchical import HierarchicalConfig
 from tsforecasting.models.registry import BuiltModel
+from tsforecasting.utils.serialization import dataclass_to_yaml, write_json
 
 _CSV_ARTIFACTS = ["backtest_predictions", "metrics", "runtime_metrics", "model_comparison"]
 _HIERARCHICAL_CSV_ARTIFACTS = [
@@ -36,7 +34,7 @@ def write_artifacts(
     model_comparison: pd.DataFrame,
     predictions: pd.DataFrame | None = None,
 ) -> None:
-    """Validate and write all per-run CSV artifacts to ``run_dir``."""
+    """校验并写出普通 forecast 运行的全部 CSV artifact。"""
     run_dir.mkdir(parents=True, exist_ok=True)
     frames = {
         "backtest_predictions": backtest_predictions,
@@ -58,7 +56,7 @@ def build_manifest(
     run_dir: Path,
     do_predict: bool,
 ) -> dict[str, Any]:
-    """Assemble the run manifest dict (provenance, mapping, artifacts, env)."""
+    """组装普通 forecast manifest，记录来源、字段映射、产物路径和运行环境。"""
     has_predict = do_predict and config.predict is not None
     artifacts: dict[str, str] = {
         name: str((run_dir / f"{name}.csv").resolve()) for name in _CSV_ARTIFACTS
@@ -123,19 +121,12 @@ def build_manifest(
 
 
 def write_manifest(manifest: dict[str, Any], run_dir: Path) -> None:
-    run_dir.mkdir(parents=True, exist_ok=True)
-    (run_dir / "manifest.json").write_text(
-        json.dumps(manifest, indent=2, default=str), encoding="utf-8"
-    )
+    write_json(run_dir / "manifest.json", manifest)
 
 
 def write_run_config(config: Config, run_dir: Path) -> None:
-    """Persist the resolved config (with CLI overrides) as YAML."""
-    run_dir.mkdir(parents=True, exist_ok=True)
-    payload = dataclasses.asdict(config)
-    (run_dir / "run_config.yaml").write_text(
-        yaml.safe_dump(payload, sort_keys=False), encoding="utf-8"
-    )
+    """把解析后的最终配置写成 YAML，包括 CLI override 后的值。"""
+    dataclass_to_yaml(run_dir / "run_config.yaml", config)
 
 
 def write_hierarchical_artifacts(
@@ -145,7 +136,7 @@ def write_hierarchical_artifacts(
     reconciled_predictions: pd.DataFrame,
     reconciliation_diagnostics: pd.DataFrame,
 ) -> None:
-    """Validate and write the three P9 reconciliation CSV artifacts."""
+    """校验并写出层级协调流程的三个 CSV artifact。"""
     run_dir.mkdir(parents=True, exist_ok=True)
     frames = {
         "base_predictions": base_predictions,
@@ -162,7 +153,7 @@ def build_hierarchical_manifest(
     loaded_meta: dict[str, Any],
     run_dir: Path,
 ) -> dict[str, Any]:
-    """Assemble the hierarchical run manifest (provenance, hierarchy, artifacts)."""
+    """组装层级协调 manifest，记录层级结构、reconciler 和产物路径。"""
     artifacts = {
         name: str((run_dir / f"{name}.csv").resolve())
         for name in _HIERARCHICAL_CSV_ARTIFACTS

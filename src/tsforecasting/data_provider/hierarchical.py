@@ -1,10 +1,9 @@
-"""Hierarchical dataset loading (P9).
+"""层级数据集加载。
 
-Loads a grouped hierarchical dataset (MVP: TourismSmall via ``datasetsforecast``)
-into the Nixtla ``Y_df / S_df / tags`` triple, with ``S_df`` reshaped so its node
-ids live in a ``unique_id`` column (the shape ``HierarchicalReconciliation``
-expects). ``datasetsforecast`` is imported lazily so the base package stays
-importable without the ``hierarchical`` extra.
+把 datasetsforecast 的层级数据加载成 Nixtla 生态使用的
+``Y_df / S_df / tags`` 三元组，并把 ``S_df`` 的节点 id 调整到
+``unique_id`` 列上。``datasetsforecast`` 延迟导入，保证未安装
+``hierarchical`` extra 时基础包仍可 import。
 """
 
 from __future__ import annotations
@@ -21,7 +20,7 @@ from tsforecasting.data_provider.loader import DataError
 
 @dataclass
 class LoadedHierarchical:
-    """Hierarchical triple plus metadata for the manifest."""
+    """层级三元组和写入 manifest 所需的元数据。"""
 
     Y_df: pd.DataFrame
     S_df: pd.DataFrame
@@ -30,14 +29,14 @@ class LoadedHierarchical:
 
 
 def load_hierarchical(data: HierarchicalDataConfig) -> LoadedHierarchical:
-    """Load ``Y_df / S_df / tags`` for a datasetsforecast hierarchical group."""
+    """读取 datasetsforecast 层级数据集，返回 ``Y_df / S_df / tags``。"""
     if data.source != "datasetsforecast":
         raise DataError(f"data.source '{data.source}' not supported")
     from datasetsforecast.hierarchical import HierarchicalData
 
-    # Signature advertises (Y_df, S_df) but the call returns 3 values incl. tags.
+    # 上游签名文档只写 (Y_df, S_df)，实际还会返回 tags。
     Y_df, S_df, tags = HierarchicalData.load(data.cache_dir, group=data.dataset)
-    # Node ids come back in the S_df index; reconcile() needs a unique_id column.
+    # 上游把节点 id 放在 S_df index；reconcile() 需要 unique_id 列。
     if "unique_id" not in S_df.columns:
         S_df = S_df.reset_index(names="unique_id")
     meta = {

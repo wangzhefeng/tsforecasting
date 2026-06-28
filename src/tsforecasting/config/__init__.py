@@ -1,20 +1,23 @@
-"""Configuration schema, loading, validation, and override resolution."""
+"""配置类型、加载、校验和 CLI override 解析的公开入口。"""
 
-from tsforecasting.config.schema import (
+from tsforecasting.config.common import (
+    VALID_LOG_LEVELS,
+    ArtifactsConfig,
+    ConfigError,
+    RuntimeConfig,
+    generate_run_id,
+)
+from tsforecasting.config.forecast import (
     CORE_METRICS,
     SUPPORTED_BACKENDS,
-    ArtifactsConfig,
     BacktestConfig,
     Config,
-    ConfigError,
     DataConfig,
     EvaluationConfig,
     MLForecastConfig,
     ModelConfig,
     PredictConfig,
     PredictionIntervalsConfig,
-    RuntimeConfig,
-    generate_run_id,
     load_config,
     resolve_overrides,
     validate,
@@ -34,6 +37,7 @@ __all__ = [
     "PredictionIntervalsConfig",
     "RuntimeConfig",
     "SUPPORTED_BACKENDS",
+    "VALID_LOG_LEVELS",
     "generate_run_id",
     "load_config",
     "resolve_overrides",

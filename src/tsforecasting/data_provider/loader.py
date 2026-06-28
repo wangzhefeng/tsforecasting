@@ -1,14 +1,11 @@
-"""Canonical data loader: CSV -> Nixtla long table (``unique_id / ds / y``).
+"""标准数据加载器：CSV -> Nixtla 长表（``unique_id / ds / y``）。
 
-Responsibilities (per docs/unified-ts-framework-plan-v2.md §5.1):
+职责边界：
 
-- Field mapping: ``time_col -> ds``, ``target_col -> y``, and ``id_col`` ->
-  ``unique_id``. When ``id_col`` is null (single series), assign
-  ``unique_id = "series_0"``.
-- ``ds`` must be parseable to a timestamp.
-- No duplicate ``ds`` under the same ``unique_id`` (error).
-- ``freq`` must be explicitly configured or stably inferrable; otherwise error.
-- Missing time points are reported (counted), never silently filled.
+- 字段映射：``time_col -> ds``，``target_col -> y``，``id_col -> unique_id``。
+- 单序列配置没有 ``id_col`` 时，自动使用 ``series_0``。
+- ``ds`` 必须能解析成时间戳；同一 ``unique_id`` 下不能有重复 ``ds``。
+- ``freq`` 必须显式配置或能稳定推断；缺失时间点只统计，不自动填补。
 """
 
 from __future__ import annotations
@@ -24,19 +21,19 @@ DEFAULT_UNIQUE_ID = "series_0"
 
 
 class DataError(ValueError):
-    """Raised when input data violates the canonical contract."""
+    """输入数据不满足标准长表契约时抛出。"""
 
 
 @dataclass
 class LoadedData:
-    """Canonical long table plus mapping/stats metadata for the manifest."""
+    """标准长表和写入 manifest 所需的数据映射/统计信息。"""
 
     df: pd.DataFrame
     meta: dict[str, Any]
 
 
 def load_data(data: DataConfig) -> LoadedData:
-    """Load a CSV into the canonical ``unique_id / ds / y`` long table."""
+    """读取 CSV 并转换为标准 ``unique_id / ds / y`` 长表。"""
     df = pd.read_csv(data.path)
 
     if data.time_col not in df.columns:
@@ -84,6 +81,7 @@ def load_data(data: DataConfig) -> LoadedData:
 
 
 def _resolve_freq(df: pd.DataFrame, configured: str | None) -> tuple[str, bool]:
+    """解析频率；优先使用显式配置，否则用第一条序列推断。"""
     if configured:
         return configured, False
     first_id = sorted(df["unique_id"].unique())[0]
@@ -97,6 +95,7 @@ def _resolve_freq(df: pd.DataFrame, configured: str | None) -> tuple[str, bool]:
 
 
 def _count_missing_points(df: pd.DataFrame, freq: str) -> int:
+    """统计每条序列在完整时间网格上的缺失点数量，不修改原始数据。"""
     total = 0
     for _, sub in df.groupby("unique_id"):
         sub = sub.sort_values("ds")

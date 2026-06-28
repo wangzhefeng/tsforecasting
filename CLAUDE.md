@@ -29,7 +29,8 @@ Read these before implementation:
 - CLI public import stays `tsforecasting.cli:main`; keep `src/tsforecasting/cli/__init__.py` as a thin export and place parser/command handlers in focused `cli/*.py` modules.
 - MVP-0 is Nixtla-only StatsForecast first: `SeasonalNaive` / `AutoETS`, UtilsForecast metrics, core artifacts, and manifest.
 - MVP-1 adds MLForecast, NeuralForecast CPU smoke, and HierarchicalForecast with `TourismSmall`.
-- Each **forecast** backend is an adapter under `src/tsforecasting/models/nixtla/` mirroring `StatsForecastAdapter` (`predict`/`cross_validation` returning the canonical long contracts with the dense-rank `horizon` column + a `timing` dict); `src/tsforecasting/orchestration/run.py` groups models by backend, builds one adapter per backend, and lazy-imports optional backends so the base install stays importable. **Hierarchical reconciliation is a separate flow** (`config/hierarchical.py` + `reconciliation.py` + `orchestration/reconcile.py` + the `reconcile` CLI subcommand) with its own `HierarchicalConfig` and artifact set (`base_predictions` / `reconciled_predictions` / `reconciliation_diagnostics`), not a forecast adapter.
+- Each **forecast** backend is an adapter under `src/tsforecasting/models/nixtla/` mirroring `StatsForecastAdapter` (`predict`/`cross_validation` returning the canonical long contracts with the dense-rank `horizon` column + a `timing` dict); `src/tsforecasting/orchestration/forecast_workflow.py` groups models by backend, builds one adapter per backend, and lazy-imports optional backends so the base install stays importable. **Hierarchical reconciliation is a separate flow** (`config/hierarchical.py` + `reconciliation/` + `orchestration/reconciliation_workflow.py` + the `reconcile` CLI subcommand) with its own `HierarchicalConfig` and artifact set (`base_predictions` / `reconciled_predictions` / `reconciliation_diagnostics`), not a forecast adapter.
+- Shared helpers belong in `src/tsforecasting/utils/` once used across subsystem boundaries (`imports.py`, `frames.py`, `runtime.py`, `serialization.py`); do not hide cross-backend helpers inside one adapter module.
 - Full Nixtla catalog, Jupyter reporting, TimeGPT, legacy adapters, and local foundation models are future phases, not MVP-0 blockers.
 - Reuse Nixtla native APIs for training, prediction, cross-validation, feature handling, evaluation, plotting, and reconciliation when available.
 - Phase-2 opt-ins: `prediction_intervals.levels` appends `lo-/hi-` columns to predictions/backtest and `coverage-/width-` rows to metrics (statsforecast native `level=`, neuralforecast quantile loss via the `nhits_quantile` preset, mlforecast conformal — predict-only since MLForecast emits no cv intervals); `model_comparison` appends the interval columns but still ranks on the core point metric; `report --html` executes the notebook and exports HTML (needs the `[report]` extra + a registered `python3` kernel).
@@ -41,6 +42,7 @@ Read these before implementation:
 - After implementation work, update `docs/PLAN.md` plan-item status and append `docs/LOG.md`.
 - If architecture scope, MVP boundary, or module responsibilities change again, create a new scheme document such as `docs/unified-ts-framework-plan-v3.md` based on the latest baseline.
 - Keep `CLAUDE.md` concise: hard rules only, no development history.
+- Source docstrings/comments should use Chinese for non-obvious responsibilities, data contracts, and constraints; do not translate obvious code line by line or change CLI/artifact text just for comment cleanup.
 
 ## Logging
 

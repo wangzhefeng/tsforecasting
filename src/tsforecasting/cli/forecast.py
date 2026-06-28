@@ -1,4 +1,4 @@
-"""Forecast and backtest CLI commands."""
+"""普通 forecast/backtest CLI 子命令实现。"""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import sys
 
 
 def load_and_resolve(args: argparse.Namespace) -> object | None:
+    """加载配置、应用 CLI override；配置错误转成 CLI 友好返回。"""
     from tsforecasting.config import ConfigError, load_config, resolve_overrides
 
     try:
@@ -25,6 +26,7 @@ def load_and_resolve(args: argparse.Namespace) -> object | None:
 
 
 def print_dry_run(label: str, config: object) -> None:
+    """打印最终生效的运行计划；不读取数据、不训练模型、不写 artifact。"""
     print(f"dry-run plan ({label}):")
     print(f"  run_id:      {config.run_id}")
     print(f"  output_dir:  {config.artifacts.output_dir}")
@@ -52,6 +54,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 
 def cmd_backtest(args: argparse.Namespace) -> int:
+    """执行只回测不未来预测的 CLI 命令。"""
     from tsforecasting.orchestration import run_pipeline
 
     config = load_and_resolve(args)

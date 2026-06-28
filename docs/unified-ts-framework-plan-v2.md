@@ -121,6 +121,9 @@ tsforecasting/
         hierarchical.py
         report.py
       config/
+        common.py
+        forecast.py
+        hierarchical.py
       data_provider/
       evaluation/
       artifacts/
@@ -129,8 +132,24 @@ tsforecasting/
         nixtla/
           stats.py
       orchestration/
+        forecast_workflow.py
+        reconciliation_workflow.py
+      reconciliation/
+        core.py
+        diagnostics.py
+        resolvers.py
+      reporting/
+        detect.py
+        notebook.py
+        templates.py
+        export.py
+        generate.py
       utils/
         logging.py
+        imports.py
+        frames.py
+        runtime.py
+        serialization.py
   tests/
     unit/
     integration/
@@ -157,6 +176,7 @@ dev            = [pytest, ruff]                              # 测试与 lint
 - `src/tsforecasting/utils/logging.py` 是正式日志工具；包内任何模块都不得 import 仓库顶层 `utils/`，否则安装包会依赖仓库根目录、不可独立安装。
 - 日志 handler 必须保持 lazy：首次 `get_logger()` 才建 handler，避免测试 import 建目录、避免多模块 import 叠加 handler。
 - `SERVICE_LOG_LEVEL` 继续控制日志级别，`LOG_NAME` 继续控制日志目录语义。
+- 跨子系统复用的动态 import、wide→long frame 归一、运行环境设置、JSON/YAML 写入 helper 属于 `src/tsforecasting/utils/`，不要放在某个具体 backend 或 workflow 模块里。
 
 ## 5. 数据、配置与回测契约
 
@@ -443,6 +463,7 @@ Phase 2 验收：
 | 2026-06-23 | 评审修订：TourismSmall MiddleOut 参数取值修正 + pandas 3.x 兼容风险 | `top_down_method: proportion_averages` 非合法值；pandas 3.x 与 Nixtla 兼容性未验证 | §8 改为 `avg_proportions` 并要求对齐 `methods.py`；§10 + P1 dependency spike 兜底 pin `pandas<3` |
 | 2026-06-23 | P9 实测修正 `top_down_method` 合法值 | `avg_proportions` 在 hierarchicalforecast 1.5.1 实测非法；合法值为 `average_proportions`/`forecast_proportions`/`proportion_averages`（P0.3 误把合法的 `proportion_averages` 当非法、改成非法的 `avg_proportions`） | §8 `top_down_method` 改回 `average_proportions`，合法值清单更新为三选 |
 | 2026-06-27 | 知识同步：当前状态、CLI 语义和 run_id 规则对齐实现 | v2 仍含早期预实现口径、MVP-0 CLI 限定和 `<短hash>` run_id 描述，已与 P22 实现不一致 | §1 改为已实现框架阶段；§3.1 run_id 改为 `<random8>`；§4 依赖分组补齐当前 extras；§5.2 改为当前 CLI 子命令与 override 复校验规则 |
+| 2026-06-27 | 模块职责边界重构 | config、workflow、reconciliation、reporting 与通用 helper 过于集中，且存在私有函数跨模块复用 | §4 更新当前 package/module 结构；明确跨子系统 helper 归入 `src/tsforecasting/utils/` |
 
 ## 12. 参考资料
 

@@ -1,24 +1,18 @@
-"""NeuralForecast backend adapter.
+"""NeuralForecast 后端适配器。
 
-Wraps the native NeuralForecast ``fit`` / ``predict`` / ``cross_validation``
-APIs and normalizes their wide output into the unified long-table artifact
-contracts (predictions.csv / backtest_predictions.csv), including the
-framework-derived ``horizon`` column. Mirrors ``StatsForecastAdapter`` /
-``MLForecastAdapter`` surface-for-surface so the orchestration layer can treat
-all backends uniformly.
+负责调用 NeuralForecast 原生 ``fit`` / ``predict`` / ``cross_validation``，
+并把 wide 输出归一到统一长表 artifact 契约。类接口与 stats/ml adapter 对齐，
+让 workflow 可以统一调度不同 backend。
 
-When ``levels`` is provided the ``lo-{level}``/``hi-{level}`` columns are
-appended. NeuralForecast emits these from a quantile-loss model (e.g.
-``NHITS(loss=MQLoss)``) with column names like ``NHITS-lo-80.0`` /
-``NHITS-median``; this adapter strips the trailing ``.0`` and uses ``median``
-as the point forecast, then reuses the shared ``melt_forecast_long`` helper.
+预测区间来自 quantile-loss 模型（例如 ``NHITS(loss=MQLoss)``）。上游列名
+形如 ``NHITS-lo-80.0`` / ``NHITS-median``；适配器会去掉 ``.0``，并把
+``median`` 归一成点预测列，再复用共享 melt helper。
 
-Timing: all configured models are fit in one batched NeuralForecast object, so
-the timings are batch-level and shared across models in ``runtime_metrics``.
+耗时语义：同一 backend 的所有模型被放进一个 NeuralForecast 对象中批量执行，
+因此 ``runtime_metrics`` 中这些模型共享同一组耗时。
 
-``neuralforecast`` is imported at module top, but this module is only imported
-by the orchestration layer inside the ``neuralforecast`` backend branch, so the
-base package (without the ``neural`` extra) still imports cleanly.
+本模块只会在 workflow 的 ``neuralforecast`` 分支里被导入，所以基础安装环境
+未安装 ``neural`` extra 时仍能 import 主包。
 """
 
 from __future__ import annotations
@@ -32,40 +26,36 @@ from tsforecasting.artifacts.schema import (
     BACKTEST_PREDICTIONS_COLUMNS,
     PREDICTIONS_COLUMNS,
 )
-from tsforecasting.models.nixtla.stats import (
+from tsforecasting.models.registry import BuiltModel
+from tsforecasting.utils.frames import (
     NON_MODEL_COLS_CV,
     NON_MODEL_COLS_FORECAST,
-    _is_pure_model_col,
+    add_dense_horizon,
     interval_columns,
+    is_pure_model_col,
     melt_forecast_long,
 )
-from tsforecasting.models.registry import BuiltModel
 
 
 def _make_lightning_logger():
-    """Route Lightning TensorBoard telemetry under ``logs/lightning/``.
+    """把 Lightning TensorBoard 日志归并到 ``logs/lightning/``。
 
-    Without this, Lightning's default logger writes to ``./lightning_logs/``
-    (one ``version_N/`` per fit). Routing under ``logs/`` keeps neural telemetry
-    with the rest of the run logs. This NeuralForecast version takes
-    ``trainer_kwargs`` on each *model* (not on ``NeuralForecast`` itself); the
-    adapter merges this logger into every model's ``trainer_kwargs``, which the
-    model then forwards to its Lightning ``Trainer``. The import is lazy so the
-    base package (without the ``neural`` extra) still imports cleanly.
+    如果不设置，上游默认写到根目录 ``./lightning_logs/``。当前
+    NeuralForecast 版本要求把 ``trainer_kwargs`` 挂到每个模型实例上，
+    因此这里返回 logger 后由 adapter 合并到每个模型的 trainer_kwargs。
     """
     try:
         from lightning.pytorch.loggers import TensorBoardLogger
-    except ImportError:  # older neuralforecast pins
+    except ImportError:  # 兼容较旧的 neuralforecast 依赖组合。
         from pytorch_lightning.loggers import TensorBoardLogger
     return TensorBoardLogger(save_dir="logs", name="lightning")
 
 
 def _normalize_neural_cols(wide: pd.DataFrame) -> pd.DataFrame:
-    """Normalize NeuralForecast column names so the shared melt helper matches.
+    """归一 NeuralForecast 列名，使共享 melt helper 能正确识别模型和区间列。
 
-    - interval cols carry a trailing ``.0`` (``NHITS-lo-80.0`` -> ``NHITS-lo-80``)
-    - the point forecast of a quantile model is ``NHITS-median`` -> ``NHITS``
-      (interval cols are keyed on the model alias, not the median column)
+    - 区间列去掉尾部 ``.0``：``NHITS-lo-80.0`` -> ``NHITS-lo-80``。
+    - quantile 模型的点预测 ``NHITS-median`` 归一为 ``NHITS``。
     """
     rename: dict[str, str] = {}
     for c in wide.columns:
@@ -77,7 +67,7 @@ def _normalize_neural_cols(wide: pd.DataFrame) -> pd.DataFrame:
 
 
 class NeuralForecastAdapter:
-    """Adapt NeuralForecast batched output to the unified long contracts."""
+    """把 NeuralForecast 批量输出适配成统一预测/回测长表。"""
 
     backend = "neuralforecast"
 
@@ -94,9 +84,8 @@ class NeuralForecastAdapter:
         self._freq = freq
         self.run_id = run_id
         self._levels = list(levels) if levels else None
-        # This NeuralForecast version builds its Lightning Trainer from each
-        # model's trainer_kwargs; merge in a logger so TensorBoard telemetry
-        # lands under logs/lightning/ instead of the default ./lightning_logs/.
+        # 当前上游从每个模型的 trainer_kwargs 构造 Lightning Trainer；这里逐个
+        # 合并 logger，避免遥测散落到根目录 lightning_logs/。
         lightning_logger = _make_lightning_logger()
         for m in built_models:
             tk = dict(getattr(m.instance, "trainer_kwargs", {}) or {})
@@ -122,12 +111,16 @@ class NeuralForecastAdapter:
         self.timing["fit_seconds"] += time.perf_counter() - t0
 
         t0 = time.perf_counter()
-        # quantile-loss models emit lo/hi from their quantiles; level not passed here
+        # quantile-loss 模型按自身 quantile 输出 lo/hi；predict 阶段不再传 level。
         fcst = self._nf.predict(h=h)
         self.timing["predict_seconds"] += time.perf_counter() - t0
 
         fcst = _normalize_neural_cols(fcst)
-        pure = [c for c in fcst.columns if c not in NON_MODEL_COLS_FORECAST and _is_pure_model_col(c)]
+        pure = [
+            c
+            for c in fcst.columns
+            if c not in NON_MODEL_COLS_FORECAST and is_pure_model_col(c)
+        ]
         long = melt_forecast_long(fcst, NON_MODEL_COLS_FORECAST, self._name_map(pure), self._levels)
         long["backend"] = self.backend
         long["run_id"] = self.run_id
@@ -149,16 +142,18 @@ class NeuralForecastAdapter:
         self.timing["cross_validation_seconds"] += time.perf_counter() - t0
 
         cv = _normalize_neural_cols(cv)
-        pure = [c for c in cv.columns if c not in NON_MODEL_COLS_CV and _is_pure_model_col(c)]
+        pure = [
+            c
+            for c in cv.columns
+            if c not in NON_MODEL_COLS_CV and is_pure_model_col(c)
+        ]
         long = melt_forecast_long(cv, NON_MODEL_COLS_CV, self._name_map(pure), self._levels)
         long["backend"] = self.backend
         long["run_id"] = self.run_id
         long = long.sort_values(["unique_id", "cutoff", "model", "ds"]).reset_index(
             drop=True
         )
-        long["horizon"] = (
-            long.groupby(["unique_id", "cutoff"])["ds"].rank(method="dense").astype(int)
-        )
+        long = add_dense_horizon(long)
         return long[list(BACKTEST_PREDICTIONS_COLUMNS) + interval_columns(self._levels)]
 
     @property

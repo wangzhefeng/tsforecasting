@@ -9,6 +9,73 @@
 - 具体计划项状态记录在 `docs/PLAN.md` 的“计划项实现记录”。
 - 日志条目应包含日期、类型、摘要、涉及文件、验证命令、结果和下一步。
 
+## 2026-06-28 - neat-freak 知识同步收尾
+
+- 类型：docs（知识整理）+ memory
+- 摘要：按 `neat-freak` 对模块职责重构、删除 `config/schema.py`、中文注释整理后的知识入口做收尾审查。尺寸体检确认 `AGENTS.md` / `CLAUDE.md` 未膨胀；README 文档入口从 P24 更新到 P25；根规则文件新增一条长期规则，要求源码 docstring/comment 优先用中文说明非显然职责、数据契约和约束，并避免为注释整理改变 CLI/artifact 文本。
+- 涉及文件：
+  - `README.md`、`AGENTS.md`、`CLAUDE.md`、`docs/LOG.md`
+  - 记忆 note：`/Users/wangzf/.codex/memories/extensions/ad_hoc/notes/2026-06-28-tsforecasting-refactor-comments-sync.md`
+- 验证命令：
+
+```bash
+wc -l AGENTS.md CLAUDE.md README.md docs/*.md
+rg -n "今天|昨天|刚刚|最近|上周|today|yesterday|recently" AGENTS.md CLAUDE.md README.md docs/PLAN.md docs/unified-ts-framework-plan-v2.md
+UV_CACHE_DIR=.uv_cache uv run ruff check .
+```
+
+- 结果：通过。尺寸未超限；活跃文档相对时间 grep 0 命中；`ruff` All checks passed。
+- 下一步：继续保持 `docs/PLAN.md` 记录实施状态、`docs/LOG.md` 记录事实日志，AGENTS/CLAUDE 只放长期规则。
+
+## 2026-06-27 - 主要函数和关键代码中文注释整理
+
+- 类型：chore（可读性整理，行为保持）
+- 摘要：按用户要求，为项目主要函数和关键代码路径补充中文 docstring 与关键块注释，并把原有英文注释尽量改为中文。覆盖 CLI、config、workflow、data_provider、artifacts、evaluation、models、reconciliation、reporting、utils 等主线模块；保留 CLI help、notebook 标题、catalog 生成内容等用户可见输出文本，避免改变外部行为。
+- 涉及文件：
+  - `src/tsforecasting/{__init__,artifacts,cli,config,data_provider,evaluation,models,orchestration,reconciliation,reporting,utils}/`
+  - `docs/PLAN.md`、`docs/LOG.md`
+- 验证命令：
+
+```bash
+UV_CACHE_DIR=.uv_cache uv run ruff check src/tsforecasting
+UV_CACHE_DIR=.uv_cache uv run pytest -q tests/unit/test_config.py tests/unit/test_hierarchical.py
+UV_CACHE_DIR=.uv_cache uv run pytest -q tests/unit/test_reconciliation.py tests/unit/test_reporting.py tests/unit/test_stats_backend.py tests/unit/test_ml_backend.py tests/unit/test_neural_backend.py
+```
+
+- 结果：通过。`ruff` All checks passed；配置/层级单元测试 41 passed；核心拆分与后端 adapter 单元测试 16 passed / 1 skipped / 20 warnings（warnings 来自 NeuralForecast/PyTorch Lightning 小样本训练设置）。
+- 下一步：后续新增模块时继续保持注释解释职责、输入输出契约和非显然约束，避免逐行翻译显而易见代码。
+
+## 2026-06-27 - 模块职责重构
+
+- 类型：chore（结构重组）
+- 摘要：按用户 review 对 config、workflow、reconciliation、reporting 与通用工具函数做职责拆分。`config/common.py` 承载公共解析、运行 override 与 run_id；`config/forecast.py` 承载普通 forecast 配置；删除重构后与 `config/__init__.py` 重复的 `schema.py` 兼容残留；`config/hierarchical.py` 不再引用 forecast schema 私有函数。`orchestration/run.py` / `reconcile.py` 改为 `forecast_workflow.py` / `reconciliation_workflow.py`，并保留 `run_pipeline` / `run_reconciliation` 公开导出。根层 `reconciliation.py` 与 `reporting.py` 拆为 package；新增 `utils/imports.py`、`utils/frames.py`、`utils/runtime.py`、`utils/serialization.py`，承接动态 import、wide-to-long 归一、运行环境初始化和 JSON/YAML 写入。
+- 涉及文件：
+  - `src/tsforecasting/config/{common,forecast,hierarchical,__init__}.py`
+  - `src/tsforecasting/orchestration/{forecast_workflow,reconciliation_workflow,__init__}.py`
+  - `src/tsforecasting/reconciliation/{__init__,core,diagnostics,resolvers}.py`
+  - `src/tsforecasting/reporting/{__init__,detect,notebook,templates,export,generate}.py`
+  - `src/tsforecasting/utils/{imports,frames,runtime,serialization}.py`
+  - `src/tsforecasting/models/{registry,nixtla/stats,nixtla/ml,nixtla/neural}.py`
+  - `src/tsforecasting/artifacts/writer.py`
+  - `AGENTS.md`、`CLAUDE.md`、`README.md`、`docs/unified-ts-framework-plan-v2.md`、`docs/PLAN.md`、`docs/LOG.md`
+- 验证命令：
+
+```bash
+UV_CACHE_DIR=.uv_cache uv run ruff check .
+UV_CACHE_DIR=.uv_cache uv run pytest -q tests/unit/test_config.py tests/unit/test_hierarchical.py
+UV_CACHE_DIR=.uv_cache uv run pytest -q tests/unit/test_reconciliation.py tests/unit/test_reporting.py
+UV_CACHE_DIR=.uv_cache uv run pytest -q tests/unit/test_stats_backend.py tests/unit/test_ml_backend.py tests/unit/test_neural_backend.py
+UV_CACHE_DIR=.uv_cache uv run pytest -q tests/integration/test_run_smoke.py tests/integration/test_reconcile_smoke.py
+UV_CACHE_DIR=.uv_cache uv run tsforecasting validate-config --config configs/examples/ett_small/stats.yaml
+UV_CACHE_DIR=.uv_cache uv run tsforecasting run --config configs/examples/ett_small/stats.yaml --dry-run
+UV_CACHE_DIR=.uv_cache uv run tsforecasting reconcile --config configs/examples/tourism_small/hierarchical.yaml --dry-run
+UV_CACHE_DIR=.uv_cache uv run tsforecasting report --run-dir /tmp/nonexistent
+UV_CACHE_DIR=.uv_cache uv run pytest -q
+```
+
+- 结果：通过。`ruff` All checks passed；目标测试通过；integration smoke `8 passed`；全量 `pytest` 为 98 passed / 1 skipped / 20 warnings（warnings 来自 NeuralForecast/PyTorch Lightning 小样本训练设置）；三个正向 CLI smoke 均返回 0；`report --run-dir /tmp/nonexistent` 在 base 环境友好返回 1 且无 traceback。
+- 下一步：后续新增跨子系统 helper 时优先放入 `utils/`；新增 workflow 时采用 `*_workflow.py` 命名并通过包 `__init__.py` 保留稳定公开导出。
+
 ## 2026-06-27 - CLI 模块职责拆分
 
 - 类型：chore（结构重组）+ fix

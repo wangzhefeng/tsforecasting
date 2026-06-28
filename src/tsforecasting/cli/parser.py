@@ -1,4 +1,4 @@
-"""Argument parser construction for the tsforecasting CLI."""
+"""tsforecasting CLI 的 argparse 构建逻辑。"""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ def _add_run_overrides(parser: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """构建完整 CLI parser；这里只声明参数，不执行业务逻辑。"""
     parser = argparse.ArgumentParser(
         prog="tsforecasting",
         description="Unified time-series forecasting on the Nixtla stack.",

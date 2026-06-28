@@ -1,4 +1,4 @@
-"""Canonical data loading and the Nixtla long-table contract."""
+"""标准数据加载和 Nixtla 长表契约。"""
 
 from tsforecasting.data_provider.hierarchical import (
     LoadedHierarchical,

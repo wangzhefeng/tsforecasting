@@ -1,4 +1,4 @@
-"""Model registry and backend adapters."""
+"""模型 registry 和 backend adapter 公开入口。"""
 
 from tsforecasting.models.registry import (
     REGISTRY,

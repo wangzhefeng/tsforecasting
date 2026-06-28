@@ -43,7 +43,7 @@ uv run pytest && uv run ruff check .
 
 ## 文档入口
 
-- [docs/PLAN.md](docs/PLAN.md) — 可执行开发计划与计划项实现记录（**P1–P15 全 done**；P16–P19 Phase 2 backlog）。
+- [docs/PLAN.md](docs/PLAN.md) — 可执行开发计划与计划项实现记录（**P1–P15/P20–P25 已完成**；P16–P19 Phase 2 backlog）。
 - [docs/model_catalog.md](docs/model_catalog.md) — full Nixtla model catalog（78 条 stats/neural/ml 模型 + 来源 + 验证状态）。
 - [docs/unified-ts-framework-plan-v2.md](docs/unified-ts-framework-plan-v2.md) — 当前实施基线（契约 / 架构）。
 - [docs/unified-ts-framework-plan-v1.md](docs/unified-ts-framework-plan-v1.md) — v1 历史基线，**已被 v2 取代**，仅作设计史保留，勿据其 §5/§6 实施。

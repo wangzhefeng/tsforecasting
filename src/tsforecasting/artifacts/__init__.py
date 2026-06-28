@@ -1,4 +1,4 @@
-"""Artifact column contracts and the artifact writer."""
+"""artifact 列契约和写入器。"""
 
 from tsforecasting.artifacts.schema import (
     ARTIFACT_CONTRACTS,

@@ -1,23 +1,19 @@
-"""Vendored logging utility.
+"""项目内置日志工具。
 
-Behavior contract ported from the repo-top-level ``utils/log_util.py``:
+行为契约来自原仓库顶层 ``utils/log_util.py``：
 
-- Console (stderr) handler + daily rotating file handler, same formatter.
-- ``SERVICE_LOG_LEVEL`` controls the log level (default ``INFO``).
-- ``LOG_NAME`` selects the subdirectory under ``logs/`` (default ``main``),
-  i.e. ``logs/{LOG_NAME}/service*``.
+- 同时写 stderr 和按天滚动的文件日志，格式保持一致。
+- ``SERVICE_LOG_LEVEL`` 控制日志级别，默认 ``INFO``。
+- ``LOG_NAME`` 控制 ``logs/`` 下的子目录，默认 ``main``，
+  即 ``logs/{LOG_NAME}/service*``。
 
-Deliberate changes vs the original (per docs/unified-ts-framework-plan-v2.md):
+相对原实现的刻意调整：
 
-- **Lazy**: handlers and the log directory are created on the first
-  ``get_logger()`` call, not at import time, so importing the package has no
-  filesystem side effects and tests don't create stray ``logs/`` dirs.
-- **Idempotent**: ``get_logger()`` never attaches duplicate handlers.
-- **CWD-relative base**: the ``logs/`` directory is resolved relative to the
-  current working directory, not to this file, so the installed package does
-  not depend on the repository root and never writes inside ``site-packages``.
+- 延迟初始化：首次 ``get_logger()`` 时才创建 handler 和日志目录，import 包不产生文件系统副作用。
+- 幂等：重复调用 ``get_logger()`` 不会重复挂 handler。
+- 相对当前工作目录写日志：安装后的包不会依赖仓库根目录，也不会写入 ``site-packages``。
 
-No module inside the package may import the repo-top-level ``utils/``.
+包内模块不能导入仓库顶层 ``utils/``。
 """
 
 from __future__ import annotations
@@ -48,10 +44,9 @@ def _log_dir() -> Path:
 
 
 def get_logger(name: str = DEFAULT_LOGGER_NAME) -> logging.Logger:
-    """Return the named logger, lazily attaching console + rotating file handlers.
+    """返回指定 logger，并延迟挂载控制台和按天滚动的文件 handler。
 
-    Calling this repeatedly with the same ``name`` returns the same logger
-    without stacking additional handlers.
+    同名 logger 重复调用会复用已有 handler，避免日志重复输出。
     """
     logger = logging.getLogger(name)
     if logger.handlers:

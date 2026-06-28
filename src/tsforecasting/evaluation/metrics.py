@@ -1,4 +1,4 @@
-"""Evaluation: UtilsForecast metrics, runtime metrics, and model comparison."""
+"""评估模块：计算 UtilsForecast 指标、运行耗时指标和模型排序表。"""
 
 from __future__ import annotations
 
@@ -19,12 +19,11 @@ _CORE_METRICS = ["mae", "rmse", "mape", "smape"]
 
 
 def compute_metrics(backtest: pd.DataFrame, run_id: str) -> pd.DataFrame:
-    """Compute the 4 core UtilsForecast metrics per model (long form).
+    """按模型计算四个核心 UtilsForecast 指标，并返回长表。
 
-    The contract fixes the core metrics as ``mae / rmse / mape / smape`` (v2
-    "at least these four"); all four are always produced. ``evaluation.metrics``
-    constrains the allowed configured core metric set and ``rank_metric``
-    validity, but it does not filter this output.
+    当前 artifact 契约固定输出 ``mae / rmse / mape / smape`` 四个核心指标。
+    ``evaluation.metrics`` 只限制配置中允许声明的核心指标集合，并用于校验
+    ``rank_metric``；它不是 ``metrics.csv`` 的输出筛选器。
     """
     wide = backtest.pivot(
         index=["unique_id", "cutoff", "ds", "y"], columns="model", values="yhat"
@@ -37,7 +36,7 @@ def compute_metrics(backtest: pd.DataFrame, run_id: str) -> pd.DataFrame:
         metrics=[_METRIC_FNS[m] for m in _CORE_METRICS],
         models=model_cols,
     )
-    # eval_df: unique_id, cutoff, metric, <model cols>; average across windows+series
+    # UtilsForecast 输出是 unique_id/cutoff/metric + 各模型列；这里跨窗口和序列求均值。
     agg = eval_df.groupby("metric")[model_cols].mean()
 
     backend_of = (
@@ -59,9 +58,8 @@ def compute_metrics(backtest: pd.DataFrame, run_id: str) -> pd.DataFrame:
                 }
             )
 
-    # optional interval metrics (coverage / width) when backtest carries lo/hi.
-    # These are additive to metrics.csv but excluded from model_comparison,
-    # which only pivots the four core metrics.
+    # 若 backtest 带有 lo-/hi- 区间列，则追加 coverage/width 指标。
+    # 这些是 metrics.csv 的增量列，不改变 model_comparison 的核心排序逻辑。
     levels = sorted({int(c.split("-", 1)[1]) for c in backtest.columns if c.startswith("lo-")})
     for level in levels:
         lo_col, hi_col = f"lo-{level}", f"hi-{level}"
@@ -99,10 +97,10 @@ def build_runtime_metrics(
     n_series: int,
     n_rows: int,
 ) -> pd.DataFrame:
-    """Per-model runtime metrics.
+    """生成每个模型的运行耗时指标。
 
-    ``timings`` maps backend -> batch-shared timing dict (each adapter fits all
-    of its models in one batched object, so timing is shared within a backend).
+    ``timings`` 是 backend -> 批量耗时字典。每个 adapter 会把同 backend 的模型
+    放进一个 Nixtla 批量对象中训练/预测，因此同 backend 内模型共享这组耗时。
     """
     rows = []
     for b in built_models:
@@ -134,7 +132,7 @@ def build_model_comparison(
     runtime_metrics: pd.DataFrame,
     rank_metric: str = "mae",
 ) -> pd.DataFrame:
-    """Wide ranked summary: metrics pivot + total_seconds + rank by ``rank_metric``."""
+    """生成宽表模型对比：核心指标透视、合并总耗时，并按 rank_metric 排名。"""
     wide = metrics.pivot(
         index=["run_id", "backend", "model"], columns="metric", values="value"
     ).reset_index()
@@ -147,8 +145,7 @@ def build_model_comparison(
     comp["rank_metric"] = rank_metric
     comp = comp.sort_values(rank_metric, ascending=True, kind="stable").reset_index(drop=True)
     comp["rank"] = np.arange(1, len(comp) + 1)
-    # Append any interval metric columns (coverage-/width-) for display; ranking
-    # still uses the core point rank_metric.
+    # 区间指标仅作为展示列附加；排名仍使用核心点预测指标。
     interval_cols = [
         c for c in wide.columns if c.startswith("coverage-") or c.startswith("width-")
     ]

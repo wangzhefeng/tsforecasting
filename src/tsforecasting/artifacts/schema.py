@@ -1,8 +1,7 @@
-"""Artifact column contracts and validation.
+"""Artifact 列契约和写入前校验。
 
-Field schemas are pinned to docs/unified-ts-framework-plan-v2.md §7. Each
-contract lists the required columns; ``validate_columns`` asserts an artifact
-DataFrame carries them before it is written to disk.
+字段 schema 与方案文档中的 artifact 契约保持一致。每个契约只声明必需列；
+``validate_columns`` 在写 CSV 前检查这些列是否存在，避免产物静默漂移。
 """
 
 from __future__ import annotations
@@ -48,7 +47,7 @@ MODEL_COMPARISON_COLUMNS = [
     "rank",
 ]
 
-# P9 hierarchical reconciliation artifacts (independent of the MVP-0 contracts).
+# 层级协调产物独立于普通 forecast artifact 契约。
 BASE_PREDICTIONS_COLUMNS = ["unique_id", "ds", "yhat", "model", "run_id"]
 RECONCILED_PREDICTIONS_COLUMNS = [
     "unique_id",
@@ -79,11 +78,11 @@ ARTIFACT_CONTRACTS = {
 
 
 class ArtifactError(ValueError):
-    """Raised when an artifact DataFrame violates its column contract."""
+    """artifact DataFrame 不满足列契约时抛出。"""
 
 
 def validate_columns(df: pd.DataFrame, name: str) -> pd.DataFrame:
-    """Assert ``df`` has every required column for artifact ``name``."""
+    """确认指定 artifact 的必需列都存在；允许额外列用于向后兼容扩展。"""
     expected = ARTIFACT_CONTRACTS.get(name)
     if expected is None:
         raise ArtifactError(f"unknown artifact contract '{name}'")

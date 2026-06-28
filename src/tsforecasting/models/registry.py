@@ -1,23 +1,23 @@
-"""Preset registry.
+"""模型 preset registry。
 
-Maps config model names to their ``class_path`` plus metadata (backend,
-model_type, status, dependency_group). MVP-0 registers the two StatsForecast
-smoke models; MVP-1 adds the MLForecast sklearn presets. The full Nixtla
-catalog is a Phase-2 concern.
+把 YAML 中的 ``models[].name`` 映射到真实类路径和元数据（backend、model_type、
+dependency_group 等）。配置校验只读取这些元数据；真正的动态 import 和实例化
+发生在 workflow 构建模型阶段。
 """
 
 from __future__ import annotations
 
-import importlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
+
+from tsforecasting.utils.imports import instantiate_from_spec, resolve_class
 
 if TYPE_CHECKING:
     from tsforecasting.config import Config, ModelConfig
 
 
 class RegistryError(ValueError):
-    """Raised when a model is unknown or its backend mismatches the registry."""
+    """模型未知或配置 backend 与 registry 元数据不匹配时抛出。"""
 
 
 @dataclass(frozen=True)
@@ -58,9 +58,8 @@ REGISTRY: list[RegistryEntry] = [
         status="mvp_smoke",
         dependency_group="core",
     ),
-    # MLForecast sklearn presets (MVP-1). class_path targets the inner sklearn
-    # regressor; build_model instantiates it via cls(**params) and the
-    # MLForecastAdapter wraps the instances in one MLForecast framework object.
+    # MLForecast 的 class_path 指向内部 sklearn regressor；adapter 会把这些
+    # regressor 统一包进一个 MLForecast 框架对象。
     RegistryEntry(
         backend="mlforecast",
         model_name="linear_regression",
@@ -115,10 +114,8 @@ REGISTRY: list[RegistryEntry] = [
         status="mvp_smoke",
         dependency_group="ml",
     ),
-    # NeuralForecast CPU-smoke presets (MVP-1). class_path targets the neural
-    # model class; build_model instantiates it via cls(**params) (params carry
-    # h / input_size / max_steps) and the NeuralForecastAdapter wraps the
-    # instances in one NeuralForecast framework object.
+    # NeuralForecast 的 class_path 指向具体神经网络模型类；训练步数、输入窗口等
+    # 超参来自 models[].params，adapter 再统一包进 NeuralForecast。
     RegistryEntry(
         backend="neuralforecast",
         model_name="nhits",
@@ -137,9 +134,8 @@ REGISTRY: list[RegistryEntry] = [
         status="mvp_smoke",
         dependency_group="neural",
     ),
-    # NeuralForecast quantile preset (Phase 2): NHITS trained with a multi-quantile
-    # loss (MQLoss) so it emits median point forecasts + lo/hi intervals. The loss
-    # is passed via a serializable {class, kwargs} spec in models[].params.
+    # 区间预测 preset：通过可序列化 loss spec 构造 MQLoss，让模型输出 median
+    # 点预测和 lo-/hi- 区间列，同时保持 run_config.yaml 可读可复现。
     RegistryEntry(
         backend="neuralforecast",
         model_name="nhits_quantile",
@@ -152,25 +148,13 @@ REGISTRY: list[RegistryEntry] = [
 ]
 
 
-def _index() -> dict[str, RegistryEntry]:
-    return {entry.model_name: entry for entry in REGISTRY}
-
-
 def get_entry(model_name: str) -> RegistryEntry:
-    index = _index()
+    index = {entry.model_name: entry for entry in REGISTRY}
     if model_name not in index:
         raise RegistryError(
             f"model '{model_name}' not in registry; known: {sorted(index)}"
         )
     return index[model_name]
-
-
-def _import_class(class_path: str) -> type:
-    module_path, _, cls_name = class_path.rpartition(".")
-    if not module_path or not cls_name:
-        raise RegistryError(f"invalid class_path '{class_path}'")
-    module = importlib.import_module(module_path)
-    return getattr(module, cls_name)
 
 
 def build_model(model: "ModelConfig") -> BuiltModel:
@@ -180,19 +164,17 @@ def build_model(model: "ModelConfig") -> BuiltModel:
             f"model '{model.name}': config backend '{model.backend}' "
             f"!= registry backend '{entry.backend}'"
         )
-    cls = _import_class(entry.class_path)
+    cls = resolve_class(entry.class_path)
     params = dict(model.params)
-    # Resolve a serializable loss spec `{class, kwargs?}` (neural quantile models)
-    # into the actual loss instance, keeping run_config.yaml YAML-safe.
+    # 将 YAML 中可序列化的 loss spec 转成真实 loss 实例，避免配置文件写入对象。
     if isinstance(params.get("loss"), dict):
         spec = params.pop("loss")
         if not isinstance(spec.get("class"), str) or not spec["class"].strip():
             raise RegistryError(f"model '{model.name}': loss.class must be a string")
-        lcls = _import_class(spec["class"])
         kwargs = spec.get("kwargs") or {}
         if not isinstance(kwargs, dict):
             raise RegistryError(f"model '{model.name}': loss.kwargs must be a mapping")
-        params["loss"] = lcls(**kwargs)
+        params["loss"] = instantiate_from_spec(spec["class"], kwargs)
     return BuiltModel(
         name=model.name,
         backend=entry.backend,
@@ -202,5 +184,5 @@ def build_model(model: "ModelConfig") -> BuiltModel:
 
 
 def build_models(config: "Config") -> list[BuiltModel]:
-    """Instantiate one BuiltModel per entry in ``config.models``."""
+    """按 config.models 顺序实例化模型，保留后续输出列到模型名的映射顺序。"""
     return [build_model(m) for m in config.models]

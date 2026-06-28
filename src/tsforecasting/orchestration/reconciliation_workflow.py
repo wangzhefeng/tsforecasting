@@ -1,17 +1,8 @@
-"""Hierarchical reconciliation orchestration (P9).
-
-Independent of ``run_pipeline``: load a hierarchical dataset, hold out the last
-``horizon`` steps, base-forecast + reconcile, then write the three P9 artifacts.
-"""
+"""层级预测协调工作流：加载层级数据、切分 holdout、协调并写产物。"""
 
 from __future__ import annotations
 
-import dataclasses
-import os
 from pathlib import Path
-
-import numpy as np
-import yaml
 
 from tsforecasting.artifacts.writer import (
     build_hierarchical_manifest,
@@ -22,15 +13,15 @@ from tsforecasting.config.hierarchical import HierarchicalConfig
 from tsforecasting.data_provider import load_hierarchical
 from tsforecasting.models import build_model
 from tsforecasting.reconciliation import reconcile_pipeline
-from tsforecasting.utils.logging import get_logger
+from tsforecasting.utils.runtime import configure_run_environment
+from tsforecasting.utils.serialization import dataclass_to_yaml
 
 
 def run_reconciliation(config: HierarchicalConfig) -> Path:
-    """Load -> base forecast -> reconcile -> diagnostics -> artifacts."""
-    os.environ["LOG_NAME"] = config.runtime.log_name
-    os.environ["SERVICE_LOG_LEVEL"] = config.runtime.log_level
-    logger = get_logger()
-    np.random.seed(config.seed)
+    """执行层级协调流程，并把 artifact 写到 ``output_dir/run_id``。"""
+    logger = configure_run_environment(
+        config.runtime.log_name, config.runtime.log_level, config.seed
+    )
 
     logger.info("starting reconciliation run_id=%s", config.run_id)
     loaded = load_hierarchical(config.data)
@@ -43,6 +34,7 @@ def run_reconciliation(config: HierarchicalConfig) -> Path:
     )
 
     horizon = config.base_forecast.horizon
+    # 使用最后 horizon 个时间点作为 holdout；train 用于 base forecast 和 reconcile。
     last = sorted(loaded.Y_df["ds"].unique())[-horizon:]
     train = loaded.Y_df[~loaded.Y_df["ds"].isin(last)].copy()
     test = loaded.Y_df[loaded.Y_df["ds"].isin(last)].copy()
@@ -79,8 +71,11 @@ def run_reconciliation(config: HierarchicalConfig) -> Path:
     )
     manifest = build_hierarchical_manifest(config, loaded.meta, run_dir)
     write_manifest(manifest, run_dir)
-    (run_dir / "run_config.yaml").write_text(
-        yaml.safe_dump(dataclasses.asdict(config), sort_keys=False), encoding="utf-8"
-    )
+    dataclass_to_yaml(run_dir / "run_config.yaml", config)
     logger.info("artifacts written to %s", run_dir)
     return run_dir
+
+
+def run_reconciliation_workflow(config: HierarchicalConfig) -> Path:
+    """更清晰的 workflow 别名；保留 run_reconciliation 兼容旧导入。"""
+    return run_reconciliation(config)

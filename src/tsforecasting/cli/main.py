@@ -1,4 +1,4 @@
-"""Main dispatcher for the tsforecasting CLI."""
+"""tsforecasting CLI 主分发器。"""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from tsforecasting.cli.validate import cmd_validate_config
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """解析参数并按子命令分发；作为 console script 的稳定入口。"""
     parser = build_parser()
     args = parser.parse_args(argv)
     dispatch = {

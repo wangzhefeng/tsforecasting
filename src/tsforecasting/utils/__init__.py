@@ -1,1 +1,1 @@
-"""Shared utilities (logging, etc.)."""
+"""跨模块共享工具函数。"""

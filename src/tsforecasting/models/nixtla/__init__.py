@@ -1,4 +1,4 @@
-"""Nixtla backend adapters (StatsForecast for MVP-0)."""
+"""Nixtla 后端适配器。"""
 
 from tsforecasting.models.nixtla.stats import StatsForecastAdapter
 

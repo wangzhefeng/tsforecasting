@@ -1,14 +1,12 @@
-"""Full Nixtla model catalog (Phase 2).
+"""完整 Nixtla 模型目录（Phase 2）。
 
-A data-only registry of the Nixtla model directories (statsforecast /
-neuralforecast / mlforecast-sklearn) tracked by ``tsforecasting``, with each
-model's source URL and validation status. This is the documentation/tracking
-layer for plan §6/§9 ("full catalog with source and status"); it is independent
-of ``REGISTRY`` (the ``build_model`` mvp presets) — ``cataloged`` models are not
-necessarily buildable without per-model verification.
+这是只读数据目录，记录 ``tsforecasting`` 跟踪的 statsforecast /
+neuralforecast / mlforecast-sklearn 模型、来源 URL 和验证状态。它服务于
+“完整 catalog + source + status”的文档跟踪，不等同于运行时 ``REGISTRY``；
+``cataloged`` 模型只是已列入目录，不代表已经逐个验证可运行。
 
-Status lifecycle: ``cataloged`` (listed, not verified) -> ``mvp_smoke``
-(smoke-tested) -> ``validated`` | ``blocked`` | ``deprecated``.
+状态流转：``cataloged``（已列入，未验证）-> ``mvp_smoke``（smoke 通过）
+-> ``validated`` / ``blocked`` / ``deprecated``。
 """
 
 from __future__ import annotations
@@ -30,7 +28,7 @@ class CatalogEntry:
     dependency_group: str
 
 
-# Models already smoke-tested through REGISTRY/build_model (P3-P8).
+# 已通过 REGISTRY/build_model smoke 测试的模型。
 _MVP_PRESETS = frozenset(
     {
         "seasonal_naive",
@@ -53,7 +51,7 @@ _BACKEND_DOC = {
 }
 _BACKEND_DEP = {"statsforecast": "core", "mlforecast": "ml", "neuralforecast": "neural"}
 
-# (name, backend, class_path, model_type)
+# 字段顺序：(name, backend, class_path, model_type)
 _RAW: list[tuple[str, str, str, str]] = [
     # --- statsforecast ---
     ("seasonal_naive", "statsforecast", "statsforecast.models.SeasonalNaive", "naive"),
@@ -166,7 +164,7 @@ CATALOG: list[CatalogEntry] = [
 def list_catalog(
     backend: str | None = None, status: str | None = None
 ) -> list[CatalogEntry]:
-    """Filter the catalog by backend and/or status."""
+    """按 backend 和/或 status 过滤模型目录。"""
     return [
         e
         for e in CATALOG
@@ -176,7 +174,7 @@ def list_catalog(
 
 
 def generate_catalog_md() -> str:
-    """Render the catalog as a markdown document (one table per backend)."""
+    """把模型目录渲染成 Markdown，每个 backend 一张表。"""
     counts = Counter(e.status for e in CATALOG)
     status_line = ", ".join(f"{s}={counts.get(s, 0)}" for s in VALID_STATUSES)
     lines = [

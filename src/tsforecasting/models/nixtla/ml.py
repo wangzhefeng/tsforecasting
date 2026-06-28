@@ -1,23 +1,19 @@
-"""MLForecast backend adapter.
+"""MLForecast 后端适配器。
 
-Wraps the native MLForecast ``fit`` / ``predict`` / ``cross_validation`` APIs
-and normalizes their wide output into the unified long-table artifact contracts
-(predictions.csv / backtest_predictions.csv), including the framework-derived
-``horizon`` column. Mirrors ``StatsForecastAdapter`` surface-for-surface so the
-orchestration layer can treat both backends uniformly.
+负责调用 MLForecast 原生 ``fit`` / ``predict`` / ``cross_validation``，
+并把 wide 输出归一到统一长表 artifact 契约（``predictions.csv`` /
+``backtest_predictions.csv``）。类接口刻意与 ``StatsForecastAdapter`` 对齐，
+让 workflow 可以按 backend 批量处理。
 
-Timing: like StatsForecast, the adapter fits all configured models in one
-batched MLForecast object, so ``fit`` / ``predict`` / ``cross_validation``
-timings are batch-level and shared across models in ``runtime_metrics``.
+耗时语义：同一 backend 的所有模型被放进一个 MLForecast 对象中批量执行，
+因此 ``runtime_metrics`` 中这些模型共享同一组 fit/predict/cv 耗时。
 
-``mlforecast`` is imported at module top, but this module is only imported by
-the orchestration layer inside the ``mlforecast`` backend branch, so the base
-package (without the ``ml`` extra) still imports cleanly.
+本模块只会在 workflow 的 ``mlforecast`` 分支里被导入，所以基础安装环境
+未安装 ``ml`` extra 时仍能 import 主包。
 """
 
 from __future__ import annotations
 
-import importlib
 import time
 from typing import Any
 
@@ -29,30 +25,25 @@ from tsforecasting.artifacts.schema import (
     PREDICTIONS_COLUMNS,
 )
 from tsforecasting.config import MLForecastConfig
-from tsforecasting.models.nixtla.stats import (
+from tsforecasting.models.registry import BuiltModel
+from tsforecasting.utils.frames import (
     NON_MODEL_COLS_CV,
     NON_MODEL_COLS_FORECAST,
-    _is_pure_model_col,
+    add_dense_horizon,
     interval_columns,
+    is_pure_model_col,
     melt_forecast_long,
 )
-from tsforecasting.models.registry import BuiltModel
+from tsforecasting.utils.imports import instantiate_serialized_spec
 
 
 def _resolve_target_transforms(specs: list[dict[str, Any]]) -> list[Any]:
-    """Instantiate target transforms from a serializable ``{class, args?, kwargs?}`` spec."""
-    transforms: list[Any] = []
-    for spec in specs:
-        module_path, _, cls_name = spec["class"].rpartition(".")
-        if not module_path or not cls_name:
-            raise ValueError(f"invalid target_transform class path '{spec['class']}'")
-        cls = getattr(importlib.import_module(module_path), cls_name)
-        transforms.append(cls(*spec.get("args") or [], **(spec.get("kwargs") or {})))
-    return transforms
+    """把 YAML 中可序列化的 target_transform spec 实例化为真实对象。"""
+    return [instantiate_serialized_spec(spec) for spec in specs]
 
 
 class MLForecastAdapter:
-    """Adapt MLForecast batched output to the unified long contracts."""
+    """把 MLForecast 批量输出适配成统一预测/回测长表。"""
 
     backend = "mlforecast"
 
@@ -91,7 +82,7 @@ class MLForecastAdapter:
         }
 
     def _name_map(self, model_cols: list[str]) -> dict[str, str]:
-        # MLForecast emits one column per model in ``models=`` list order.
+        # MLForecast 按 models= 列表顺序输出每个模型的预测列。
         if len(model_cols) != len(self._built):
             raise ValueError(
                 f"model column count {len(model_cols)} != built models {len(self._built)}"
@@ -117,7 +108,11 @@ class MLForecastAdapter:
             fcst = self._mlf.predict(h)
         self.timing["predict_seconds"] += time.perf_counter() - t0
 
-        pure = [c for c in fcst.columns if c not in NON_MODEL_COLS_FORECAST and _is_pure_model_col(c)]
+        pure = [
+            c
+            for c in fcst.columns
+            if c not in NON_MODEL_COLS_FORECAST and is_pure_model_col(c)
+        ]
         name_map = self._name_map(pure)
         long = melt_forecast_long(fcst, NON_MODEL_COLS_FORECAST, name_map, self._levels)
         long["backend"] = self.backend
@@ -147,11 +142,9 @@ class MLForecastAdapter:
         long = long.sort_values(["unique_id", "cutoff", "model", "ds"]).reset_index(
             drop=True
         )
-        # horizon = step index of ds within each (unique_id, cutoff) window;
-        # equals (ds - cutoff) / freq for a regular grid, but rank is robust.
-        long["horizon"] = (
-            long.groupby(["unique_id", "cutoff"])["ds"].rank(method="dense").astype(int)
-        )
+        # horizon 表示同一 (unique_id, cutoff) 窗口内 ds 的步数；rank 比直接
+        # 用时间差除 freq 更能容忍 pandas/上游的频率表示差异。
+        long = add_dense_horizon(long)
         return long[list(BACKTEST_PREDICTIONS_COLUMNS)]
 
     @property
