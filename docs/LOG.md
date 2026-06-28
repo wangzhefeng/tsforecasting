@@ -9,6 +9,26 @@
 - 具体计划项状态记录在 `docs/PLAN.md` 的“计划项实现记录”。
 - 日志条目应包含日期、类型、摘要、涉及文件、验证命令、结果和下一步。
 
+## 2026-06-28 - 修复 nixtla 包可选 backend import 泄漏
+
+- 类型:fix(import 契约)
+- 摘要:`models/nixtla/__init__.py` 顶部 import ml/neural adapter 会强制加载 mlforecast/neuralforecast,破坏 lazy-import-optional-backend 契约——base install(未装 ml/neural extra)无法 `import tsforecasting.main`(模拟 base 实测 ImportError)。改为 PEP 562 `__getattr__` 延迟暴露:stats 仍顶部 eager(base 依赖),ml/neural 仅在显式属性访问时加载。新增 `tests/unit/test_import_safety.py` 用子进程屏蔽可选 extra,锁住「base 可 import 主包」契约。保留用户暴露 ml/neural 接口的意图(包装级 import 仍可用)。
+- 涉及文件:
+  - `src/tsforecasting/models/nixtla/__init__.py`
+  - `tests/unit/test_import_safety.py`
+  - `docs/PLAN.md`
+  - `docs/LOG.md`
+- 验证命令:
+
+```bash
+.venv/bin/python -c "import sys;sys.modules['mlforecast']=None;sys.modules['neuralforecast']=None;import tsforecasting.main"
+.venv/bin/ruff check .
+.venv/bin/python -m pytest -q
+```
+
+- 结果:通过。模拟 base import OK;ruff clean;pytest 93 passed / 20 warnings。
+- 下一步:—
+
 ## 2026-06-28 - 删除死代码 orchestration/ 包
 
 - 类型:chore(死代码清理)
